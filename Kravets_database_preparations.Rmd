@@ -24,7 +24,7 @@ library(dplyr)
 ```
 
 ```{r}
-database = read_tsv("raw_database.tsv")
+database = read_tsv("data/raw_database.tsv")
 ```
 # Доделываем БД
 ## Отбираем колонки
@@ -147,37 +147,38 @@ database_selected <- database_selected |>
   select(date, year, everything()) |>
   select(-week_end, -WEEK)
 
-database_selected <- database_selected |>
-  group_by(hosp, type, year) |>
-  arrange(date) |>
-  mutate(week = row_number()) |>
+database_selected_final <- database_selected |>
+  group_by(hosp, type, date) |>
+  mutate(week_num = row_number()) |>
   ungroup()
 
-database_selected <- database_selected |>
-  select(week, date, everything())
+database_selected_final <- database_selected_final |>
+  select(week_num, date, everything())
+head(database_selected_final)
 ```
 
 ## Сначала засуммируем др и невр
 Видим, что в др нет "Всего_с_ОНМК" => значит можем засуммировать невр и др (type 1 и type 2)  
 
 ```{r}
-database_selected %>% filter(type == 2) %>% select(starts_with('Всего_с_ОНМК')) %>%
+database_selected_final %>% filter(type == 2) %>% select(starts_with('Всего_с_ОНМК')) %>%
   filter(!is.na(`Всего_с_ОНМК`))
 
-database_selected
+database_selected_final
 ```
 
 ```{r}
 #part = database_selected %>% filter(hosp %in% c("b3", "alm")) 
 
-database_summarized = database_selected %>% group_by(hosp, year, week, date) %>%
+database_summarized = database_selected_final %>% group_by(hosp, year, date) %>%
   summarise(across(everything(), sum, na.rm = TRUE), .groups = "drop")
 
 database_summarized
 ```
 ```{r}
-database_summarized %>% filter(hosp == "b3")
+database_summarized %>% filter(type != 3)
 ```
+
 ## Добавляем по месяцам
 ```{r}
 cols_to_sum = colnames(database_summarized)[6:49]
@@ -235,7 +236,7 @@ ggplot(missing_data, aes(x = month, y = hosp, fill = missing_count)) +
 ```
 
 ```{r}
-#write_tsv(database_summarized_month, "data_summarized_by_month_Kravets.tsv")
+write_tsv(database_summarized_month, "data/data_summarized_by_month_Kravets.tsv")
 ```
 
 # TODO Заполняем пропуски
@@ -351,10 +352,19 @@ filled_data <- fill_missing_values(data)
 
 # WIP Возьмём одну клинику
 ```{r}
-database_one = database_summarized_month %>% filter(hosp == "alm") %>% select(date, month)
-database_one
+database_one = database_summarized_month %>% filter(hosp == "b17") %>% 
+  select(year, month, `Суммарная_Загрузка_ОНМК`) %>% arrange(year, month)
+database_one %>% filter(year=='2018')
 ```
 
 ```{r}
-database_summarized %>% filter(year == "2021", hosp == "b3")
+database_one %>% ggplot(aes(x=month, y=`Суммарная_Загрузка_ОНМК`, 
+                            color=factor(year))) +
+  geom_path(group=year) +
+  geom_point() +
+  xlab("Месяц") +
+  ylab("Суммарная_Загрузка_ОНМК") +
+  ggtitle(paste("Центр:", "b17")) +
+  scale_y_continuous(limits=c(0, 500)) + 
+  theme_minimal()
 ```
