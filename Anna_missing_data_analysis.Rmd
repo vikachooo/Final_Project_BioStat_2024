@@ -40,6 +40,9 @@ database_summarized_month <- read_tsv("data/data_summarized_by_month_Kravets.tsv
 
 ```{r}
 load_data <- database_summarized_month %>% select(c(hosp, year, month,"Суммарная_Загрузка_ОНМК"))
+hosp_data <- database_summarized_month %>% select(c(hosp, year, month,"Суммарно_Госпитализировано"))
+thromb_data <- database_summarized_month %>% select(c(hosp, year, month,"Тромболизис"))
+death_data <- database_summarized_month %>% select(c(hosp, year, month,"Летальные_Исходы"))
 
 missing_month_in_a_year <- load_data %>%
   mutate(is_missing = ifelse(is.na(`Суммарная_Загрузка_ОНМК`), 1, 0)) %>%
@@ -68,9 +71,118 @@ ggplot(missing_month_in_a_year, aes(x = year, y = hosp), color = "white") +
   theme_minimal()+
   theme_custom
 ```
+
 Наблюдение: В ковидные года 2020 и 2021 много пропусков. 
 
-# Визуализируем данные по месяцам и года
+# Общегодовая загрузка по городу
+
+```{r}
+ggplot(load_data %>% select(year, `Суммарная_Загрузка_ОНМК`) %>% group_by(year) %>%
+  summarise( annual_total = sum(`Суммарная_Загрузка_ОНМК`, na.rm = TRUE)), aes(x=year, y = annual_total))+
+  geom_line()+
+  geom_point()+
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+  labs(
+    title = "Годовое количество ОНМК",
+    x = "Год",
+    y = "количество"
+  ) +
+
+  theme_minimal()+
+  theme_custom 
+  
+```
+
+# Общегодовая загрузка по госпитализациям по городу
+
+```{r}
+ggplot(hosp_data %>% select(year, `Суммарно_Госпитализировано`) %>% group_by(year) %>%
+  summarise( annual_total = sum(`Суммарно_Госпитализировано`, na.rm = TRUE)), aes(x=year, y = annual_total))+
+  geom_line()+
+  geom_point()+
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+  labs(
+    title = "Годовое количество госпитализаций ОНМК",
+    x = "Год",
+    y = "количество"
+  ) +
+
+  theme_minimal()+
+  theme_custom 
+  
+```
+
+# Динамика тромболизиса и летальных исходов
+
+```{r}
+temp<- thromb_data %>% mutate(year_month=anytime::anydate(paste0(year,paste0(ifelse(month<10,paste0("0",month),month),"01",sep="-"),sep="-"))) %>%
+               select(hosp, year_month, `Тромболизис`) %>%
+                 group_by(year_month) %>% summarise(thromb_city = sum(`Тромболизис`, na.rm=TRUE), .groups="drop")
+ggplot(temp, aes(x=year_month, y=thromb_city))+
+  geom_point()+
+  labs(
+    title = "Месячное количество тромболизиса по городу",
+    x = "Год",
+    y = "количество"
+  ) +
+
+  theme_minimal()+
+  theme_custom 
+ 
+```
+
+
+```{r}
+temp<- thromb_data %>% filter(hosp %in% c("gvv", "bsp", "b2", "b15")) %>% mutate(year_month=anytime::anydate(paste0(year,paste0(ifelse(month<10,paste0("0",month),month),"01",sep="-"),sep="-"))) %>%
+               select(hosp, year_month, `Тромболизис`) %>%
+                 group_by(year_month) %>% summarise(thromb_city = sum(`Тромболизис`, na.rm=TRUE), .groups="drop")
+ggplot(temp, aes(x=year_month, y=thromb_city))+
+  geom_point()+
+  labs(
+    title = "Месячное количество тромболизиса по группе 1",
+    x = "Год",
+    y = "количество"
+  ) +
+
+  theme_minimal()+
+  theme_custom 
+ 
+```
+```{r}
+temp<- death_data %>% mutate(year_month=anytime::anydate(paste0(year,paste0(ifelse(month<10,paste0("0",month),month),"01",sep="-"),sep="-"))) %>%
+               select(hosp, year_month, `Летальные_Исходы`) %>%
+                 group_by(year_month) %>% summarise(thromb_city = sum(`Летальные_Исходы`, na.rm=TRUE), .groups="drop")
+ggplot(temp, aes(x=year_month, y=thromb_city))+
+  geom_point()+
+  labs(
+    title = "Месячное количество летальных исходов по городу",
+    x = "Год",
+    y = "количество"
+  ) +
+
+  theme_minimal()+
+  theme_custom 
+ 
+```
+```{r}
+temp<- death_data %>% filter(hosp %in% c("gvv", "bsp", "b2", "b15")) %>%
+  mutate(year_month=anytime::anydate(paste0(year,paste0(ifelse(month<10,paste0("0",month),month),"01",sep="-"),sep="-"))) %>%
+               select(hosp, year_month, `Летальные_Исходы`) %>%
+                 group_by(year_month) %>% summarise(thromb_city = sum(`Летальные_Исходы`, na.rm=TRUE), .groups="drop")
+ggplot(temp, aes(x=year_month, y=thromb_city))+
+  geom_point()+
+  labs(
+    title = "Месячное количество летальных исходов в группе 1",
+    x = "Год",
+    y = "количество"
+  ) +
+
+  theme_minimal()+
+  theme_custom 
+ 
+```
+
+# Визуализируем данные по месяцам и годам
 
 ```{r, fig.height=7}
 
@@ -106,13 +218,12 @@ ggplot(missing_month_in_a_year, aes(x = year, y = hosp), color = "white") +
 ```
 
 Наблюдение: присутствууте необычный рост или спад общегодового количества суммарной загрузки ОНМК у некоторых госпиталей (b40, b 26). <br />
-b17 пропущен 2019 год <br />
 Выделим группы госпиталей: <br />
 group1 = нет пропусков gvv, bsp, b2, b15 <br />
 group2 = есть некоторые пропуски, но нет резких (кратных) скачков в общегодовом кол-ве: b3,b26 <br />
 group3 = есть некоторые пропуски, но нет резких (кратных) скачков в общегодовом кол-ве (за исключением ковидных годов 2020,2021): alm, b16, b1 <br />
 group4 = Ковидные госпиталя? b4, b38, b37, b33 <br />
-group5 =  b40, b17, b16 <br />
+group5 =  b40, b17 <br />
 group6 = mcs <br />
 med1 - исключаем
 ```{r}
@@ -120,7 +231,7 @@ group1 <- c("gvv","bsp","b2","b15")
 group2 <- c("b3","b26")
 group3 <- c("alm","b16","b1")
 group4 <- c("b4", "b38", "b37", "b33")
-group5 <- c("b40", "b17", "b16")
+group5 <- c("b40", "b17")
 group6 <- c("mcs")
 load_data <- load_data %>% filter(hosp != "med1") %>%
   mutate(group_hosp = ifelse(hosp %in% group1, 1,

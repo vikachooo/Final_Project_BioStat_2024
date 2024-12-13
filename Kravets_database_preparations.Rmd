@@ -198,6 +198,7 @@ database_summarized_month <- database_summarized %>%
 
 database_summarized_month
 ```
+
 ```{r}
 database_summarized_month <- database_summarized_month %>%
   mutate(across(where(is.numeric), ~ ifelse(rowSums(across(where(is.numeric)) == 0) == ncol(across(where(is.numeric))), NA, .)))
@@ -208,8 +209,8 @@ database_summarized_month
 ## Суммирую загрузку
 ```{r}
 database_summarized_month = database_summarized_month %>%
-  mutate(`Суммарная_Загрузка_ОНМК` = `Всего_с_ОНМК`+`Внутрибольничные_ОНМК`,
-         `Суммарно_Госпитализировано` = `Госпитализированы_с_ОНМК`+`Внутрибольничные_ОНМК`)
+  mutate(`Суммарная_Загрузка_ОНМК` = `Всего_с_ОНМК`,
+         `Суммарно_Госпитализировано` = `Госпитализированы_с_ОНМК`)
 ```
 
 ## Fancy Graphs

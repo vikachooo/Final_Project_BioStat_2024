@@ -1,5 +1,5 @@
 ---
-title: "Homework"
+title: "Сбор данных Original files"
 author: "Anna Andreychenko"
 date: "`r Sys.Date()`"
 output: 
@@ -193,7 +193,7 @@ cleaned_data <- cleaned_data %>% filter(!(year == 2017 & hosp %in% c("alm", "b17
 filter(!(year == 2018 & hosp %in% c("b17", "b37"))) %>%
   filter(!(year == 2019 & hosp %in% c("b17_past", "b17_unclear"))) %>%
   #group_by(year, hosp) %>% summarise()
-  mutate(hosp = recode(hosp, "alm_corr" = "alm", "b17_corr" = "b17",	"b37_corr"="b_37"))
+  mutate(hosp = recode(hosp, "alm_corr" = "alm", "b17_corr" = "b17",	"b37_corr"="b37"))
 ```
 
 ```{r}
