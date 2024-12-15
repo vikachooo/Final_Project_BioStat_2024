@@ -1,0 +1,1087 @@
+---
+title: "Indicators Analysis"
+author: "Victoria Zaitceva"
+date: "`r Sys.Date()`"
+output: 
+   html_document:
+       toc: true
+       toc_float:
+           collapsed: false
+           smooth_scroll: true
+       theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(ggpubr)
+library(tidyr)
+library(anytime)
+
+theme_custom <- theme(
+    panel.background = element_rect(fill = "white"),
+    plot.title = element_text(size = 15, hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5),
+    strip.text = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1), #rotate
+    axis.title = element_text(size = 10),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  )
+```
+
+
+```{r}
+database_summarized_month <- read.table("data/data_summarized_by_month_Kravets.tsv", header = TRUE, sep = "\t")
+```
+
+
+gvv,bsp and b2 - type 2 - Региональные сосудистые центры
+b15 - type 1 - Первичное сосудистое отделение, там не все индикаторы качества выполняются, поэтому я бы его исключила и вообще сравнивала РСЦ и ПСО отдельно
+
+```{r, echo=TRUE}
+group1 <- c("gvv","bsp","b2")
+all_data_group1 <- database_summarized_month %>% filter(hosp %in% group1)
+```
+
+
+
+# Структура заболеваемости
+
+## Возраст - Общегородская динамика возрастной структуры пациентов (все центры)
+
+
+```{r}
+
+data_for_plot <- database_summarized_month %>%
+  select(year, Младше_45_лет, От_45_до_60_лет, Старше_60_лет, `Пролечены_с_ОНМК_Всего`) %>%
+  group_by(year) %>%
+  summarise(
+    Младше_45_лет = sum(Младше_45_лет, na.rm = TRUE),
+    От_45_до_60_лет = sum(От_45_до_60_лет, na.rm = TRUE),
+    Старше_60_лет = sum(Старше_60_лет, na.rm = TRUE),
+    annual_total = sum(`Пролечены_с_ОНМК_Всего`, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Младше_45_лет = Младше_45_лет / annual_total * 100,
+    От_45_до_60_лет = От_45_до_60_лет / annual_total * 100,
+    Старше_60_лет = Старше_60_лет / annual_total * 100
+  ) %>%
+  pivot_longer(
+    cols = c(Младше_45_лет, От_45_до_60_лет, Старше_60_лет),
+    names_to = "Age_Category",
+    values_to = "Percentage"
+  ) %>%
+  mutate(
+    Age_Category = factor(Age_Category, 
+                            levels = c("Младше_45_лет", "От_45_до_60_лет", "Старше_60_лет"))
+  )
+
+
+
+
+ggplot(data_for_plot, aes(x = year, y = Percentage, fill = Age_Category)) +
+  geom_bar(stat = "identity") + 
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1)) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +  
+  scale_fill_manual(
+    values = c("Младше_45_лет" = "#1f77b4", 
+               "От_45_до_60_лет" = "darkred", 
+               "Старше_60_лет" = "plum3"),  
+    name = "Возраст" 
+  ) +
+  labs(
+    title = "Общегородская динамика возрастной структуры пациентов",
+    x = "",
+    y = "% от всех законченных случаев"
+  ) +
+  theme_custom
+```
+
+## NIHSS - Общий городской уровень тяжести по NIHSS (все центры)
+
+
+```{r}
+
+
+data_for_plot <- database_summarized_month %>%
+  select(year, `NIHSS_Меньше_4`, `NIHSS_5_20`, `NIHSS_Больше_21`, `Пролечены_с_ОНМК_Всего`) %>%
+  group_by(year) %>%
+  summarise(
+    NIHSS_Меньше_4 = sum(NIHSS_Меньше_4, na.rm = TRUE),
+    NIHSS_5_20 = sum(NIHSS_5_20, na.rm = TRUE),
+    NIHSS_Больше_21 = sum(NIHSS_Больше_21, na.rm = TRUE),
+    annual_total = sum(`Пролечены_с_ОНМК_Всего`, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    NIHSS_Меньше_4 = NIHSS_Меньше_4 / annual_total * 100,
+    NIHSS_5_20 = NIHSS_5_20 / annual_total * 100,
+    NIHSS_Больше_21 = NIHSS_Больше_21 / annual_total * 100
+  ) %>%
+  pivot_longer(
+    cols = c(NIHSS_Меньше_4, NIHSS_5_20, NIHSS_Больше_21),
+    names_to = "NIHSS_Category",
+    values_to = "Percentage"
+  ) %>%
+  mutate(
+    NIHSS_Category = factor(NIHSS_Category, 
+                            levels = c("NIHSS_Меньше_4", "NIHSS_5_20", "NIHSS_Больше_21"))
+  )
+
+
+
+
+
+ggplot(data_for_plot, aes(x = year, y = Percentage, fill = NIHSS_Category)) +
+  geom_bar(stat = "identity", position = "stack") +  
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1)) + 
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +  
+  scale_fill_manual(
+    values = c("NIHSS_Меньше_4" = "#1f77b4", 
+               "NIHSS_5_20" = "darkred", 
+               "NIHSS_Больше_21" = "plum3"),  
+    name = "Категория NIHSS"  
+  ) +
+  labs(
+    title = "Общегородская динамика по уровням тяжести пациентов NIHSS",
+    x = "",
+    y = "% от всех законченных случаев"
+  ) +
+  theme_custom
+
+```
+
+## Динамика в структуре заболевания (%) по годам общегородская, line plot
+
+
+```{r}
+
+stroke_types <- c("ИИ_Ишемический_Инсульт", "ГИ_Геморрагический_Инсульт", "ТИА_Транзиторная_Ишемическая_Атака")
+
+plots <- list()
+
+
+
+for (type in stroke_types) {
+  
+
+  temp <- database_summarized_month %>%
+    group_by(year) %>%
+    summarise(
+      !!sym(type) := sum(!!sym(type), na.rm = TRUE),
+      Пролечены_с_ОНМК_Всего = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      Percentage = !!sym(type) / Пролечены_с_ОНМК_Всего * 100
+    ) %>%
+    group_by(year) %>%
+    summarise(
+      Percentage = mean(Percentage, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  
+
+  plot <- ggplot(temp, aes(x = year, y = Percentage)) +
+    geom_point() +
+    geom_line() +
+    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+    labs(
+      title = paste(type),
+      x = NULL,
+      y = NULL
+    ) +
+    theme_custom +
+    theme(
+      plot.title = element_text(size = 8))
+  
+
+  plots[[type]] <- plot
+}
+
+
+
+combined_plot <- ggarrange(
+  plotlist = plots, 
+  ncol = 3, 
+  nrow = 1,
+  widths = c(1,1,1), 
+  common.legend = TRUE,  
+  labels = NULL          
+)
+
+
+
+final_plot <- annotate_figure(
+  combined_plot,
+  top = text_grob("Динамика в структуре заболевания (%)\n по годам общегородская", size = 12, face = "bold"), 
+  left = text_grob("% от общего числа пролеченных", size = 10, face = "plain", rot = 90)   
+)
+
+
+print(final_plot)
+```
+
+
+## Динамика в структуре заболевания (%) общегородская - по месяцам, line plot
+
+Сделала линию тренда, чтобы просто показать как линия выглядит если делать по месяца, но предлагаю для любых показателей по месяцам точки получше выглядят.
+
+Линии только для годовой динамики.
+
+```{r}
+
+
+stroke_types <- c("ИИ_Ишемический_Инсульт", "ГИ_Геморрагический_Инсульт", "ТИА_Транзиторная_Ишемическая_Атака")
+
+plots <- list()
+
+
+
+for (type in stroke_types) {
+  
+
+  temp <- database_summarized_month %>%
+    mutate(year_month = anytime::anydate(paste0(year, paste0(ifelse(month < 10, paste0("0", month), month), "01"), sep = "-"))) %>%
+    group_by(year_month) %>%
+    summarise(
+      !!sym(type) := sum(!!sym(type), na.rm = TRUE),
+      Пролечены_с_ОНМК_Всего = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      Percentage = !!sym(type) / Пролечены_с_ОНМК_Всего * 100
+    ) %>%
+    group_by(year_month) %>%
+    summarise(
+      Percentage = mean(Percentage, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  temp$year_month_num <- as.numeric(as.Date(temp$year_month))
+  
+
+  plot <- ggplot(temp, aes(x = year_month, y = Percentage)) +
+    geom_point(size = 1) +
+    geom_line() +
+    geom_smooth(method = "lm", se = TRUE, color = "blue") +
+    labs(
+      title = paste(type),
+      x = NULL,
+      y = NULL
+    ) +
+    theme_custom +
+    theme(
+      plot.title = element_text(size = 8))
+  
+  # Add plot to the list
+  plots[[type]] <- plot
+}
+
+
+combined_plot <- ggarrange(
+  plotlist = plots, 
+  ncol = 3, 
+  nrow = 1,
+  widths = c(1,1,1), 
+  common.legend = TRUE,  
+  labels = NULL          
+)
+
+
+
+final_plot <- annotate_figure(
+  combined_plot,
+  top = text_grob("Динамика в структуре заболевания (%) общегородская", size = 12, face = "bold"),  # Common title
+  bottom = text_grob("", size = 12, face = "plain"),  # Common x-axis title
+  left = text_grob("% от общего числа пролеченных", size = 10, face = "plain", rot = 90)  # Common y-axis title
+)
+
+
+print(final_plot)
+
+```
+
+
+## Динамика структуры заболеваемости по месяцам в группе 1 (% от общего числа пролеченных)
+
+То же самое, что и сверху, but scatter plot
+
+```{r}
+
+
+stroke_types <- c("ИИ_Ишемический_Инсульт", "ГИ_Геморрагический_Инсульт", "ТИА_Транзиторная_Ишемическая_Атака")
+
+plots <- list()
+
+
+
+for (type in stroke_types) {
+  
+
+  temp <- all_data_group1 %>%
+    mutate(year_month = anytime::anydate(paste0(year, paste0(ifelse(month < 10, paste0("0", month), month), "01"), sep = "-"))) %>%
+    group_by(year_month) %>%
+    summarise(
+      !!sym(type) := sum(!!sym(type), na.rm = TRUE),
+      Пролечены_с_ОНМК_Всего = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      Percentage = !!sym(type) / Пролечены_с_ОНМК_Всего * 100
+    ) %>%
+    group_by(year_month) %>%
+    summarise(
+      Percentage = mean(Percentage, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  # Convert year_month to numeric for correlation calculation
+  temp$year_month_num <- as.numeric(as.Date(temp$year_month))
+  
+  # Calculate correlation
+  correlation <- cor.test(temp$year_month_num, temp$Percentage)
+  
+  # Generate scatter plot
+  plot <- ggplot(temp, aes(x = year_month, y = Percentage)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = TRUE, color = "darkred") +
+    annotate(
+      "text", 
+      x = max(temp$year_month), 
+      y = max(temp$Percentage, na.rm = TRUE),
+      label = paste("r =", round(correlation$estimate, 2), 
+                    "\nP =", signif(correlation$p.value, 2)),
+      hjust = 1, vjust = 1
+    ) +
+    
+    labs(
+      title = paste(type),
+      x = NULL,
+      y = NULL
+    ) +
+    theme_custom +
+    theme(
+      plot.title = element_text(size = 8))
+  
+  # Add plot to the list
+  plots[[type]] <- plot
+}
+
+# Combine all plots using ggarrange
+combined_plot <- ggarrange(
+  plotlist = plots, 
+  ncol = 3, 
+  nrow = 1,
+  widths = c(1,1,1), 
+  common.legend = TRUE,  
+  labels = NULL         
+)
+
+
+
+final_plot <- annotate_figure(
+  combined_plot,
+  top = text_grob("Динамика в структуре заболевания (%)\n по месяцам в группе 1", size = 12, face = "bold"),
+  left = text_grob("% от общего числа пролеченных", size = 10, face = "plain", rot = 90)  # Common y-axis title
+)
+
+
+print(final_plot)
+
+```
+
+# ИИ процедуры (тромболизис и др)
+
+## Годовая доля тромболизиса от общего числа ИИ случаев - line plot
+
+```{r}
+data_prepared <- all_data_group1 %>%
+  # метка для объединенного графика
+  mutate(hosp_combined = "Суммарно") %>%
+  # общее количество летальных исходов и пролеченных случаев по году и центру
+  group_by(hosp, year) %>%
+  summarise(
+    total_thromb = sum(Тромболизис, na.rm = TRUE),  # Общее число тромболизиса
+    total_cases = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE),  # Общее число ИИ случаев
+    .groups = "drop"
+  ) %>%
+  # процент для каждого госпиталя
+  mutate(
+    thromb_проц = total_thromb / total_cases * 100
+  ) %>%
+  # суммарный график
+  bind_rows(
+    all_data_group1 %>%
+      group_by(year) %>%
+      summarise(
+        total_thromb = sum(Тромболизис, na.rm = TRUE),
+        total_cases = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(
+        hosp = "Суммарно",  
+        thromb_проц = total_thromb / total_cases * 100
+      )
+  )
+
+
+ggplot(data_prepared, aes(x = year, y = thromb_проц, colour = hosp)) +
+  geom_line(color = "black") + 
+  geom_point(color = "black") +  
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1)) + 
+  labs(
+    title = "Годовая доля тромболизиса от общего числа ИИ случаев",
+    x = "",
+    y = "%"
+  ) +
+  theme_custom +
+  facet_wrap(vars(hosp), scales = "free") 
+
+```
+
+## Процедуры при ИИ по годам в группе 1 , РСЦ
+
+% от общего числа ИИ
+
+```{r}
+
+indicators_II <- c("Тромболизис", "Тромбэкстракция", "Комбинированная_Реперфузия", "Реваскуляризация_Острый_Период")
+
+
+plots <- list()
+
+
+
+for (indicator in indicators_II) {
+  
+  temp <- all_data_group1 %>%
+    group_by(hosp, year) %>%
+    summarise(
+      !!sym(indicator) := sum(!!sym(indicator), na.rm = TRUE),
+      ИИ_Ишемический_Инсульт = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      Percentage = !!sym(indicator) / ИИ_Ишемический_Инсульт * 100
+    ) %>%
+    group_by(year) %>%
+    summarise(
+      Percentage = mean(Percentage, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+
+
+
+  plot <- ggplot(temp, aes(x = year, y = Percentage)) +
+    geom_point() +
+    geom_line() +
+    scale_x_continuous(breaks = seq(2017, 2024, by = 1)) +
+    labs(
+      title = paste(indicator),
+      x = NULL,
+      y = NULL
+    ) +
+    theme_custom +
+    theme(
+      plot.title = element_text(size = 8))
+  
+
+  plots[[indicator]] <- plot
+}
+
+
+combined_plot <- ggarrange(
+  plotlist = plots, 
+  ncol = 4, 
+  nrow = 1,
+  common.legend = TRUE,  
+  labels = NULL          
+)
+
+
+
+final_plot <- annotate_figure(
+  combined_plot,
+  top = text_grob("Выполнение процедур при ИИ (%) в группе 1", size = 12, face = "bold"),  
+  bottom = text_grob("Год", size = 12, face = "plain"),  
+  left = text_grob("% от общего числа ИИ пациентов", size = 10, face = "plain", rot = 90)  
+)
+
+
+print(final_plot)
+
+
+```
+
+
+
+
+## Процедуры при ИИ по месяцам в группе 1 , РСЦ
+
+% от общего числа ИИ
+
+```{r}
+
+indicators_II <- c("Тромболизис", "Тромбэкстракция", "Комбинированная_Реперфузия", "Реваскуляризация_Острый_Период")
+
+
+plots <- list()
+
+
+for (indicator in indicators_II) {
+  
+  temp <- all_data_group1 %>%
+    mutate(year_month = anytime::anydate(paste0(year, paste0(ifelse(month < 10, paste0("0", month), month), "01"), sep = "-"))) %>%
+    group_by(hosp, year_month) %>%
+    summarise(
+      !!sym(indicator) := sum(!!sym(indicator), na.rm = TRUE),
+      ИИ_Ишемический_Инсульт = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    mutate(
+      Percentage = !!sym(indicator) / ИИ_Ишемический_Инсульт * 100
+    ) %>%
+    group_by(year_month) %>%
+    summarise(
+      Percentage = mean(Percentage, na.rm = TRUE),
+      .groups = "drop"
+    )
+  
+  # correlation calculation
+  temp$year_month_num <- as.numeric(as.Date(temp$year_month))
+  correlation <- cor.test(temp$year_month_num, temp$Percentage)
+  
+
+  plot <- ggplot(temp, aes(x = year_month, y = Percentage)) +
+    geom_point() +
+    geom_smooth(method = "lm", se = TRUE, color = "darkred") +
+    annotate(
+      "text", 
+      x = max(temp$year_month), 
+      y = max(temp$Percentage, na.rm = TRUE),
+      label = paste("r =", round(correlation$estimate, 2), 
+                    "\nP =", signif(correlation$p.value, 2)),
+      hjust = 1, vjust = 1
+    ) +
+    labs(
+      title = paste(indicator),
+      x = NULL,
+      y = NULL
+    ) +
+    theme_custom +
+    theme(
+      plot.title = element_text(size = 8))
+  
+
+  plots[[indicator]] <- plot
+}
+
+
+combined_plot <- ggarrange(
+  plotlist = plots, 
+  ncol = 4, 
+  nrow = 1,
+  common.legend = TRUE,  
+  labels = NULL          
+)
+
+
+
+final_plot <- annotate_figure(
+  combined_plot,
+  top = text_grob("Выполнение процедур при ИИ (%) в группе 1", size = 12, face = "bold"),  
+  left = text_grob("% от общего числа ИИ пациентов", size = 10, face = "plain", rot = 90)  
+)
+
+
+print(final_plot)
+
+```
+
+Каждая процедура зависит от тяжести по NIHSS, возможно надо считать каждую процедуру как % от числа пациентов с определенным NIHSS, а не от общего числа ИИ пациентов.
+
+Типы процедур при ИИ явно не суммируются в 100%, поэтому что-то отсутсвует в данных
+
+
+
+
+
+Может быть посмотреть как соотношение уровней тяжести для каждого типа процедур меняется во времени
+Один центр - один график, где по оси Х - год, а по оси Y - барплоты с разными процетными соотношениями уровней тяжести.
+
+Процедура - барплоты, разделенные по уровням тяжести
+
+
+
+
+# Категории NIHSS для процедур при ИИ
+
+Может быть для каждой категории NIHSS характерна своя процедура?
+
+Для проекта наверно неинформативно, просто решила посмотреть.
+
+```{r}
+
+NIHHS <- c("NIHSS_Меньше_4", "NIHSS_5_20", "NIHSS_Больше_21")
+indicators_II <- c("Тромболизис", "Тромбэкстракция", "Комбинированная_Реперфузия", "Реваскуляризация_Острый_Период")
+
+
+plots <- list()
+
+for (procedure in indicators_II) {
+  temp <- all_data_group1 %>%
+    select(year, hosp, all_of(NIHHS), !!sym(procedure)) %>%
+    group_by(year) %>%
+    summarise(
+      across(all_of(NIHHS), sum, na.rm = TRUE),
+      procedure_total = sum(!!sym(procedure), na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+
+    pivot_longer(
+      cols = starts_with("NIHSS"),
+      names_to = "NIHSS_Category",
+      values_to = "Count"
+    ) %>%
+      mutate(
+    NIHSS_Category = factor(NIHSS_Category, 
+                            levels = c("NIHSS_Меньше_4", "NIHSS_5_20", "NIHSS_Больше_21"))
+  )
+  
+
+  plot <- ggplot(temp, aes(x = year, y = Count, fill = NIHSS_Category)) +
+    geom_bar(stat = "identity", position = "fill") + 
+    scale_fill_manual(
+      values = c("NIHSS_Меньше_4" = "#1f77b4", 
+                 "NIHSS_5_20" = "darkred", 
+                 "NIHSS_Больше_21" = "plum3"),
+      name = "Категория:"
+    ) +
+    scale_x_continuous(breaks = seq(2017, 2024, by = 1)) +
+    scale_y_continuous(labels = scales::percent_format(scale = 100)) +  
+    labs(
+      title = procedure,
+      x = "",
+      y = ""
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(size = 10, hjust = 0.5),
+      legend.title = element_text(size = 10),
+      legend.text = element_text(size = 8)
+    )
+  
+
+  plots[[procedure]] <- plot
+}
+
+
+combined_plot <- ggarrange(
+  plotlist = plots,
+  ncol = 2,  
+  nrow = 2,  
+  common.legend = TRUE,
+  legend = "bottom"
+) %>%
+  annotate_figure(
+  combined_plot,
+  top = text_grob("Категории пациентов для процедур при ИИ", size = 12, face = "bold"))  
+
+
+print(combined_plot)
+
+```
+Процентные соотношения аналогичны общегородским в целом.
+
+
+
+# Летальные исходы
+
+## Общегородская доля летальных исходов от общего числа пролеченных случаев
+
+
+```{r}
+data_aggregated <- database_summarized_month %>%
+  group_by(year) %>%
+  summarise(
+    total_deaths = sum(Летальные_Исходы, na.rm = TRUE), 
+    total_cases = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE), 
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Летальные_Исходы_проц = total_deaths / total_cases * 100
+  ) %>%
+  pivot_longer(
+    cols = c(Летальные_Исходы_проц),
+    names_to = "type",
+    values_to = "percentage"
+  )
+
+
+ggplot(data_aggregated, aes(x = year, y = percentage, color = type)) +
+  geom_line(color = "black") + 
+  geom_point(color = "black") + 
+  labs(
+    title = "Общегородская доля летальных исходов",
+    x = "",
+    y = "%"
+  ) +
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1)) +  
+  theme_custom +
+  theme(
+    legend.position = "none"
+  
+  )
+
+```
+
+
+## Годовая доля летальных исходов в группе 1
+
+% от Пролечены_с_ОНМК_Всего
+
+```{r}
+
+data_prepared <- all_data_group1 %>%
+  mutate(hosp_combined = "Суммарно") %>%
+  # общее количество летальных исходов и пролеченных случаев по году и центру
+  group_by(hosp, year) %>%
+  summarise(
+    total_deaths = sum(Летальные_Исходы, na.rm = TRUE), 
+    total_cases = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE), 
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Летальные_Исходы_проц = total_deaths / total_cases * 100
+  ) %>%
+  # суммарный график
+  bind_rows(
+    all_data_group1 %>%
+      group_by(year) %>%
+      summarise(
+        total_deaths = sum(Летальные_Исходы, na.rm = TRUE),
+        total_cases = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(
+        hosp = "Суммарно",  # Метка для общего графика
+        Летальные_Исходы_проц = total_deaths / total_cases * 100
+      )
+  )
+
+
+
+
+ggplot(data_prepared, aes(x = year, y = Летальные_Исходы_проц, colour = hosp)) +
+  geom_line(color = "black") +  
+  geom_point(color="black") +  
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1)) + 
+  labs(
+    title = "Годовая доля летальных исходов в группе 1",
+    x = "Год",
+    y = "Процент"
+  ) +
+  theme_custom +
+  facet_wrap(vars(hosp), scales = "free") 
+
+
+```
+
+(Не могу сделать Годовая доля летальных исходов в зависимости от типа инсульта в группе 1 , потому что это неизвестно)
+
+
+## Динамика летальных исходов по месяцам в группе 1 - line plot
+
+```{r}
+temp<- all_data_group1 %>%
+    mutate(year_month = anytime::anydate(paste0(year, paste0(ifelse(month < 10, paste0("0", month), month), "01"), sep = "-"))) %>%
+    group_by(hosp, year_month) %>%
+    summarise(
+    total_deaths = sum(Летальные_Исходы, na.rm = TRUE), 
+    total_cases = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE), 
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Летальные_Исходы_проц = total_deaths / total_cases * 100
+  )
+
+
+ggplot(temp, aes(x=year_month, y=Летальные_Исходы_проц))+
+  geom_point()+
+  geom_line() +
+  labs(
+    title = "Месячная доля летальных исходов в группе 1",
+    x = "",
+    y = "%"
+  ) +
+  theme_custom 
+```
+
+## Летальные исходы в сутки - ?
+
+Это среднее число за неделю?
+
+
+# Терапевтическое окно
+
+
+## Годовые общегородские доли пациентов, попавших в ТО (4.5 часа)
+
+```{r}
+
+data_aggregated <- database_summarized_month %>%
+  group_by(year) %>%
+  summarise(
+    total_ii_window = sum(ИИ_Терапевтическое_Окно, na.rm = TRUE),
+    total_gi_window = sum(ГИ_Терапевтическое_Окно, na.rm = TRUE),
+    total_ii_cases = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE),
+    total_gi_cases = sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    ii_проц = total_ii_window / total_ii_cases * 100,
+    gi_проц = total_gi_window / total_gi_cases * 100
+  ) %>%
+  pivot_longer(
+    cols = c(ii_проц, gi_проц),
+    names_to = "type",
+    values_to = "percentage"
+  )
+
+
+ggplot(data_aggregated, aes(x = year, y = percentage, color = type)) +
+  geom_line() + 
+  geom_point() + 
+  scale_color_manual(
+    values = c("ii_проц" = "#1f77b4", "gi_проц" = "darkred"),
+    labels = c("ii_проц" = "ИИ", "gi_проц" = "ГИ"),
+    name = "Тип инсульта"
+  ) +
+  labs(
+    title = "Общегородские доли пациентов, попавших в ТО (4.5 часа)",
+    x = "",
+    y = "%"
+  ) +
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1)) +  
+  theme_custom +
+  theme(
+    legend.position = "bottom",
+  )
+
+```
+
+
+## Годовые доли пациентов, попавших в ТО (4.5 часа) в группе 1
+
+
+```{r}
+data_prepared <- all_data_group1 %>%
+  # метка для объединенного графика
+  mutate(hosp_combined = "Суммарно") %>%
+  # общее количество летальных исходов и пролеченных случаев по году и центру
+  group_by(hosp, year) %>%
+  summarise(
+    total_ii_window = sum(ИИ_Терапевтическое_Окно, na.rm = TRUE),  
+    total_gi_window = sum(ГИ_Терапевтическое_Окно, na.rm = TRUE), 
+    total_ii_cases = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE),
+    total_gi_cases = sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  # процент для каждого госпиталя
+  mutate(
+    ii_проц = total_ii_window / total_ii_cases * 100,
+    gi_проц = total_gi_window / total_gi_cases * 100
+  ) %>%
+  # суммарный график
+  bind_rows(
+    all_data_group1 %>%
+      group_by(year) %>%
+      summarise(
+        total_ii_window = sum(ИИ_Терапевтическое_Окно, na.rm = TRUE),  
+        total_gi_window = sum(ГИ_Терапевтическое_Окно, na.rm = TRUE), 
+        total_ii_cases = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE),
+        total_gi_cases = sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(
+        hosp = "Суммарно",  
+        ii_проц = total_ii_window / total_ii_cases * 100,
+        gi_проц = total_gi_window / total_gi_cases * 100
+      )
+  )
+
+
+data_long <- data_prepared %>%
+  select(hosp, year, ii_проц, gi_проц) %>%
+  pivot_longer(
+    cols = c(ii_проц, gi_проц),
+    names_to = "type",
+    values_to = "percentage"
+  )
+
+ggplot(data_long, aes(x = year, y = percentage, color = type)) +
+  geom_line() +  
+  geom_point() +  
+  facet_wrap(vars(hosp), scales = "free") +  # Facet by hospital
+  scale_color_manual(
+    values = c("ii_проц" = "#1f77b4", "gi_проц" = "darkred"),
+    labels = c("ii_проц" = "ИИ", "gi_проц" = "ГИ"),
+    name = "Тип инсульта"
+  ) +
+  labs(
+    title = "Доли пациентов, попавших в ТО (4.5 часа) в группе 1",
+    x = "",
+    y = "%"
+  ) +
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1)) +  
+  theme_custom +
+  theme(
+    legend.position = "bottom"
+  )
+```
+
+
+## Динамика пациентов, попавших в ТО (4.5 часа) по месяцам в группе 1
+
+
+```{r}
+data_prepared <- all_data_group1 %>%
+    mutate(year_month = anytime::anydate(paste0(year, paste0(ifelse(month < 10, paste0("0", month), month), "01"), sep = "-"))) %>%
+    group_by(year_month) %>%
+    summarise(
+    total_ii_window = sum(ИИ_Терапевтическое_Окно, na.rm = TRUE),  
+    total_gi_window = sum(ГИ_Терапевтическое_Окно, na.rm = TRUE), 
+    total_ii_cases = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE),
+    total_gi_cases = sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    ii_проц = total_ii_window / total_ii_cases * 100,
+    gi_проц = total_gi_window / total_gi_cases * 100
+  )
+
+
+
+data_long <- data_prepared %>%
+  select(year_month, ii_проц, gi_проц) %>%
+  pivot_longer(
+    cols = c(ii_проц, gi_проц),
+    names_to = "type",
+    values_to = "percentage"
+  )
+
+ggplot(data_long, aes(x = year_month, y = percentage, color = type)) +
+  geom_line() +  
+  geom_point() +
+  scale_color_manual(
+    values = c("ii_проц" = "#1f77b4", "gi_проц" = "darkred"),
+    labels = c("ii_проц" = "ИИ", "gi_проц" = "ГИ"),
+    name = "Тип инсульта"
+  ) +
+  labs(
+    title = "Месячные доли пациентов, попавших в ТО (4.5 часа) в группе 1",
+    x = "",
+    y = "%"
+  ) +
+  theme_custom +
+  theme(
+    legend.position = "bottom"
+  )
+  
+```
+# Выписка 
+
+## Выписано / Госпализировано (%) - общегородской monthly trend line
+
+% от суммы Госпитализированы_с_ОНМК + Внутрибольничные_ОНМК
+
+```{r}
+data_prepared <- database_summarized_month %>%
+    mutate(year_month = anytime::anydate(paste0(year, paste0(ifelse(month < 10, paste0("0", month), month), "01"), sep = "-"))) %>%
+    group_by(year_month) %>%
+  summarise(
+    total_discharged = sum(Выписаны_Всего, na.rm = TRUE),
+    total_hospitalized = sum(Госпитализированы_с_ОНМК, Внутрибольничные_ОНМК, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    discharged_проц = total_discharged / (total_discharged + total_hospitalized) * 100,
+  ) %>%
+  pivot_longer(
+    cols = c(discharged_проц),
+    names_to = "type",
+    values_to = "percentage"
+  )
+
+
+ggplot(data_prepared, aes(x = year_month, y = percentage)) +
+  geom_line() +  
+  geom_point() +
+  labs(
+    title = "Общегородские месячные доли выписанных пациентов",
+    x = "",
+    y = "%"
+  ) +
+  theme_custom +
+  theme(
+    legend.position = "bottom"
+  )
+```
+## Выписано / Госпализировано (%) - monthly trend line для каждого РСЦ в группе 1
+
+```{r}
+
+data_prepared <- all_data_group1 %>%
+  mutate(year_month = anytime::anydate(paste0(year, paste0(ifelse(month < 10, paste0("0", month), month), "01"), sep = "-"))) %>%
+  group_by(hosp, year_month) %>%
+  summarise(
+    total_discharged = sum(Выписаны_Всего, na.rm = TRUE),
+    total_hospitalized = sum(Госпитализированы_с_ОНМК, Внутрибольничные_ОНМК, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    discharged_проц = total_discharged / (total_discharged + total_hospitalized) * 100
+  ) %>%
+
+  bind_rows(
+    all_data_group1 %>%
+      mutate(year_month = anytime::anydate(paste0(year, paste0(ifelse(month < 10, paste0("0", month), month), "01"), sep = "-"))) %>%
+      group_by(year_month) %>%
+      summarise(
+        total_discharged = sum(Выписаны_Всего, na.rm = TRUE),
+        total_hospitalized = sum(Госпитализированы_с_ОНМК, Внутрибольничные_ОНМК, na.rm = TRUE),
+        .groups = "drop"
+      ) %>%
+      mutate(
+        hosp = "Суммарно",
+        discharged_проц = total_discharged / (total_discharged + total_hospitalized) * 100
+      )
+  )
+
+
+ggplot(data_prepared, aes(x = year_month, y = discharged_проц, color = hosp)) +
+  geom_line(color = "black") +
+  geom_point(color = "black", size = 0.5) +
+  facet_wrap(~ hosp, scales = "free") +  # Facet by hospital
+  labs(
+    title = "Месячные доли пациентов, выписанных из РСЦ",
+    x = "",
+    y = "%"
+  ) +
+  theme_custom
+
+```
+
+
+
+```{r}
+colnames(database_summarized_month)
+```
+Еще сделай барплоты по шкале ривермид в соотношении
+
