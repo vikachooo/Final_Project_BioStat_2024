@@ -1,0 +1,203 @@
+---
+title: "Сбор данных Excel Working files"
+author: "Anna Andreychenko"
+date: "`r Sys.Date()`"
+output: 
+   html_document:
+       toc: true
+       toc_float:
+           collapsed: false
+           smooth_scroll: true
+       theme: flatly
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(rstatix)
+library(pROC)
+library(gtsummary)
+library(readr)
+library(dplyr)
+
+```
+
+# проверка вкладок в каждом Excel файле и создание функции отбора вкладок в зависимости от года
+
+```{r}
+years <- c(2017:2024)
+file_name <- paste0("data2/технический ", years[8],".xlsx")
+readxl::excel_sheets(file_name)
+
+ss<-0
+for (i in years) {
+  file_name <- paste0("data2/технический ", years[8],".xlsx")
+  ss<- ss+ length(readxl::excel_sheets(file_name))
+}
+```
+
+
+
+
+#  Обработаем первый год (2017) вне цикла, чтобы создать образец датафрейма, который затем будем дополнять другими годами.
+
+
+```{r}
+
+
+year <- years[1]
+file_name <- paste0("data2/технический ", year,".xlsx")
+sheet_list <- readxl::excel_sheets(file_name)
+
+
+sheet_name = sheet_list[1]
+raw_data <- readxl::read_excel(file_name, sheet= sheet_name) %>%
+  select (starts_with(c("Количество поступивших больных (п.1)", "невр", "др"))) %>% 
+  filter(!is.na(`Количество поступивших больных (п.1)`)) %>% t()
+
+colnames(raw_data) <- as.character(unlist(raw_data[1,]))
+raw_data <- data.frame(raw_data[-1,])
+raw_data <- tibble::rownames_to_column(raw_data, "WEEK")
+raw_data$hosp <- sheet_name
+raw_data$year <- year
+
+for (sheet_name in sheet_list[-c(1)]) {
+  
+  raw_data1 <- readxl::read_excel(file_name, sheet= sheet_name) %>%
+  select (starts_with(c("Количество поступивших больных (п.1)", "невр", "др"))) %>%
+    filter(!is.na(`Количество поступивших больных (п.1)`)) %>% t()
+  
+  colnames(raw_data1) <- as.character(unlist(raw_data1[1,]))
+  raw_data1 <- data.frame(raw_data1[-1,])
+  raw_data1 <- tibble::rownames_to_column(raw_data1, "WEEK")
+  raw_data1$hosp <- sheet_name
+  raw_data1$year <- year
+  raw_data <- rbind(raw_data,raw_data1)
+  
+}
+
+
+
+```
+# Обработаем остальные года
+Изменения в Excel файлы (также изменила на гугл диске!!)
+2018 - вкладка б17 изменить названия в строке 17 и 18 на
+строка 17: 3.1	с ИИ (ишемический инсульт)
+строка 18:	из них с повторным (менее 12 месяцев) ОНМК"
+
+
+
+```{r}
+
+
+for (year in years[-1]) {
+
+file_name <- paste0("data2/технический ", year,".xlsx")
+sheet_list <- readxl::excel_sheets(file_name)
+
+
+sheet_name = sheet_list[1]
+n_skip <- 0
+raw_data1 <- readxl::read_excel(file_name, sheet= sheet_name, skip=n_skip) %>%
+  select (starts_with(c("Количество поступивших больных (п.1)", "невр", "др"))) %>% 
+  filter(!is.na(`Количество поступивших больных (п.1)`)) %>% t()
+
+colnames(raw_data1) <- as.character(unlist(raw_data1[1,]))
+raw_data1 <- data.frame(raw_data1[-1,])
+raw_data1 <- tibble::rownames_to_column(raw_data1, "WEEK")
+raw_data1$hosp <- sheet_name
+raw_data1$year <- year
+raw_data <- rbind(raw_data,raw_data1)
+
+for (sheet_name in sheet_list[-c(1)]) {
+  
+  raw_data1 <- readxl::read_excel(file_name, sheet= sheet_name, skip=n_skip) %>%
+  select (starts_with(c("Количество поступивших больных (п.1)", "невр", "др"))) %>%
+    filter(!is.na(`Количество поступивших больных (п.1)`)) %>% t()
+  
+  colnames(raw_data1) <- as.character(unlist(raw_data1[1,]))
+  raw_data1 <- data.frame(raw_data1[-1,])
+  raw_data1 <- tibble::rownames_to_column(raw_data1, "WEEK")
+  raw_data1$hosp <- sheet_name
+  raw_data1$year <- year
+  raw_data <- rbind(raw_data,raw_data1)
+  
+}
+}
+
+
+```
+
+# Выделим недели
+```{r}
+raw_data <- raw_data %>%  
+  mutate(
+    across(c(hosp, year), ~ as.factor(.x)),
+    type=case_when(
+      startsWith(WEEK, "невр") ~ 1,
+      startsWith(WEEK, "др") ~ 2
+    ),
+   across(c(type), ~ as.factor(.x)),
+   week_end = str_extract(WEEK,"\\(?[0-9,.]+\\)?")
+  ) %>%
+  mutate(across(c(week_end), ~ as.factor(.x))) %>%
+  select(131, 1, 130, 128,129,2:127)
+
+
+```
+
+# Переименование госпиталей
+
+```{r}
+names <- as.character(unique(raw_data$hosp))
+```
+
+# Чистим данные
+1. Уберем значения за год (др год, невр год)
+2. Переименуем больницы
+3. Найдем года, в которых есть скорректированные вкладки
+
+```{r}
+cleaned_data <- raw_data %>% filter(!grepl('год', WEEK)) %>% mutate(hosp = as.character(hosp)) %>%
+  mutate(hosp = recode(hosp, "б1" = "b1", "б4" = "b4", "б26" = "b26", "б38"  = "b38",
+                       "гвв" = "gvv", "б3"  = "b3", "мчс" = "mcs", "niisp" = "bsp", 
+                       "б2" = "b2", "б16" = "b16",  "б40" = "b40",  "б15" = "b15",
+                       "б33" = "b33", "Алмаз скорр" = "alm_corr", "б37скорр" = "b37_corr",
+                       "б17 скорр" = "b17_corr",  "Алмазова" = "alm", "б37" = "b37",
+                       "б17" = "b17", "б37 скорр" = "b37_corr", "б17 пересчет" = "b17_unclear",
+                       "б17 прошлые" = "b17_past",  "2" = "b2", "3" = "b3", "ниисп" = "bsp",
+                       "17" = "b17",  "26" = "b26", "40" = "b40", "1" = "b1", "15" = "b15",
+                       "4" = "b4", "38" = "b38", "33" = "b33", "16" = "b16",  "37" = "b37",
+                       "1мед" = "med1"), hosp = as.factor(hosp))
+
+cleaned_data %>% filter(grepl("_corr", hosp) | grepl("_unclear", hosp) | grepl("_past", hosp)) %>%
+  group_by(year, hosp) %>% summarise()
+
+```
+ 
+# Заменим исходные вкладки на скорректированные
+ВНИМАНИЕ!!! Вкладку "б17 прошлые" удалим
+
+```{r}
+cleaned_data <- cleaned_data %>% filter(!(year == 2017 & hosp %in% c("alm", "b17", "b37"))) %>%
+filter(!(year == 2018 & hosp %in% c("b17", "b37"))) %>%
+  filter(!(year == 2019 & hosp %in% c("b17_past"))) %>%
+  #group_by(hosp, year) %>% summarise()
+  mutate(hosp = recode(hosp, "alm_corr" = "alm", "b17_corr" = "b17",	"b37_corr"="b37", "b17_unclear"="b17"))
+```
+
+```{r}
+cleaned_data <- cleaned_data %>% mutate(across(!c("week_end", "WEEK","type","hosp", "year"), ~ as.numeric(.x)))
+#skimr::skim(cleaned_data)
+cleaned_data %>% group_by(hosp) %>% summarise(n_years = length(unique(year)))
+```
+
+```{r}
+write_tsv(cleaned_data, "data/raw_database.tsv")
+```
+
+
+
+

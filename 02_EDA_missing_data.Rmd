@@ -1,0 +1,389 @@
+---
+title: "Project - missing data analysis"
+author: "Anna Andreychenko"
+date: "`r Sys.Date()`"
+output: 
+   html_document:
+       toc: true
+       toc_float:
+           collapsed: false
+           smooth_scroll: true
+       theme: flatly
+---
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = FALSE, warnings = FALSE, message = FALSE)
+
+library(tidyverse)
+library(rstatix)
+library(pROC)
+library(gtsummary)
+library(readr)
+library(dplyr)
+
+theme_custom <- theme(
+    panel.background = element_rect(fill = "white"),
+    plot.title = element_text(size = 15, hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5),
+    strip.text = element_text(size = 10),
+    axis.text = element_text(size = 10),
+    axis.title = element_text(size = 10),
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10)
+  )
+```
+
+```{r}
+database_summarized_month <- read_tsv("data/data_summarized_by_month.tsv")
+```
+
+```{r}
+load_data <- database_summarized_month %>% select(c(hosp, year, month,"Суммарная_Загрузка_ОНМК"))
+hosp_data <- database_summarized_month %>% select(c(hosp, year, month,"Суммарно_Госпитализировано"))
+thromb_data <- database_summarized_month %>% select(c(hosp, year, month,"Тромболизис"))
+death_data <- database_summarized_month %>% select(c(hosp, year, month,"Летальные_Исходы"))
+
+missing_month_in_a_year <- load_data %>%
+  mutate(is_missing = ifelse(is.na(`Суммарная_Загрузка_ОНМК`), 1, 0)) %>%
+  group_by(hosp, year) %>%
+  summarise(missing_count_month = sum(is_missing, na.rm = TRUE), .groups= "drop")
+```
+
+
+# Визуализируем пропуски
+
+
+```{r}
+
+# Plot the missing data by `hosp` and `year`
+ggplot(missing_month_in_a_year, aes(x = year, y = hosp), color = "white") +
+  geom_tile(aes(fill = missing_count_month)) +
+  scale_fill_gradient(low = "white", high = "red", name = "Missing Count") +
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+#  geom_text(data = load_data %>% group_by(hosp, year) %>% summarise(total_yearly = sum(`Суммарная_Загрузка_ОНМК`, na.rm=TRUE), .groups ="drop"), aes(x = year, y= hosp, label=total_yearly))+
+  labs(
+    title = " Amount of Missing Data by Hosp and Year",
+    x = "Year",
+    y = "Hosp"
+  ) +
+
+  theme_minimal()+
+  theme_custom
+```
+
+Наблюдение: В ковидные года 2020 и 2021 много пропусков. 
+
+# Общегодовая загрузка по городу
+
+```{r}
+ggplot(load_data %>% select(year, `Суммарная_Загрузка_ОНМК`) %>% group_by(year) %>%
+  summarise( annual_total = sum(`Суммарная_Загрузка_ОНМК`, na.rm = TRUE)), aes(x=year, y = annual_total))+
+  geom_line()+
+  geom_point()+
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+  labs(
+    title = "Годовое количество ОНМК",
+    x = "Год",
+    y = "количество"
+  ) +
+
+  theme_minimal()+
+  theme_custom 
+  
+```
+
+# Общегодовая загрузка по госпитализациям по городу
+
+```{r}
+ggplot(hosp_data %>% select(year, `Суммарно_Госпитализировано`) %>% group_by(year) %>%
+  summarise( annual_total = sum(`Суммарно_Госпитализировано`, na.rm = TRUE)), aes(x=year, y = annual_total))+
+  geom_line()+
+  geom_point()+
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+  labs(
+    title = "Годовое количество госпитализаций ОНМК",
+    x = "Год",
+    y = "количество"
+  ) +
+
+  theme_minimal()+
+  theme_custom 
+  
+```
+
+# Динамика тромболизиса и летальных исходов
+
+```{r}
+temp<- thromb_data %>% mutate(year_month=anytime::anydate(paste0(year,paste0(ifelse(month<10,paste0("0",month),month),"01",sep="-"),sep="-"))) %>%
+               select(hosp, year_month, `Тромболизис`) %>%
+                 group_by(year_month) %>% summarise(thromb_city = sum(`Тромболизис`, na.rm=TRUE), .groups="drop")
+ggplot(temp, aes(x=year_month, y=thromb_city))+
+  geom_point()+
+  labs(
+    title = "Месячное количество тромболизиса по городу",
+    x = "Год",
+    y = "количество"
+  ) +
+
+  theme_minimal()+
+  theme_custom 
+ 
+```
+
+
+```{r}
+temp<- thromb_data %>% filter(hosp %in% c("gvv", "bsp", "b2", "b15")) %>% mutate(year_month=anytime::anydate(paste0(year,paste0(ifelse(month<10,paste0("0",month),month),"01",sep="-"),sep="-"))) %>%
+               select(hosp, year_month, `Тромболизис`) %>%
+                 group_by(year_month) %>% summarise(thromb_city = sum(`Тромболизис`, na.rm=TRUE), .groups="drop")
+ggplot(temp, aes(x=year_month, y=thromb_city))+
+  geom_point()+
+  labs(
+    title = "Месячное количество тромболизиса по группе 1",
+    x = "Год",
+    y = "количество"
+  ) +
+
+  theme_minimal()+
+  theme_custom 
+ 
+```
+```{r}
+temp<- death_data %>% mutate(year_month=anytime::anydate(paste0(year,paste0(ifelse(month<10,paste0("0",month),month),"01",sep="-"),sep="-"))) %>%
+               select(hosp, year_month, `Летальные_Исходы`) %>%
+                 group_by(year_month) %>% summarise(thromb_city = sum(`Летальные_Исходы`, na.rm=TRUE), .groups="drop")
+ggplot(temp, aes(x=year_month, y=thromb_city))+
+  geom_point()+
+  labs(
+    title = "Месячное количество летальных исходов по городу",
+    x = "Год",
+    y = "количество"
+  ) +
+
+  theme_minimal()+
+  theme_custom 
+ 
+```
+```{r}
+temp<- death_data %>% filter(hosp %in% c("gvv", "bsp", "b2", "b15")) %>%
+  mutate(year_month=anytime::anydate(paste0(year,paste0(ifelse(month<10,paste0("0",month),month),"01",sep="-"),sep="-"))) %>%
+               select(hosp, year_month, `Летальные_Исходы`) %>%
+                 group_by(year_month) %>% summarise(thromb_city = sum(`Летальные_Исходы`, na.rm=TRUE), .groups="drop")
+ggplot(temp, aes(x=year_month, y=thromb_city))+
+  geom_point()+
+  labs(
+    title = "Месячное количество летальных исходов в группе 1",
+    x = "Год",
+    y = "количество"
+  ) +
+
+  theme_minimal()+
+  theme_custom 
+ 
+```
+
+# Визуализируем данные по месяцам и годам
+
+```{r, fig.height=7}
+
+ggplot(load_data, aes(x=month, y = `Суммарная_Загрузка_ОНМК`))+
+geom_point(aes(colour=hosp))+
+  scale_x_continuous(breaks = seq(1, 12, by = 1))+
+  theme_bw()+
+  theme_custom +
+  facet_wrap(vars(year), scales = "free")
+
+
+```
+
+Наблюдение: присутствуют выбросы, необходимо проверить
+
+```{r, fig.height=5}
+
+# Plot the missing data by `hosp` and `year`
+ggplot(missing_month_in_a_year, aes(x = year, y = hosp), color = "white") +
+  geom_tile(aes(fill = missing_count_month)) +
+  scale_fill_gradient(low = "white", high = "red", name = "Missing Count") +
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+  geom_text(data = load_data %>% group_by(hosp, year) %>% summarise(total_yearly = sum(`Суммарная_Загрузка_ОНМК`, na.rm=TRUE), .groups ="drop"), aes(x = year, y= hosp, label=total_yearly))+
+  labs(
+    title = "Кол-во пропущенных месяцев по госпиталям и годам",
+    subtitle = "Цифры указывают общегодовое суммарное кол-во ОНМК",
+    x = "Год",
+    y = "Госп."
+  ) +
+
+  theme_minimal()+
+  theme_custom
+```
+
+Наблюдение: присутствууте необычный рост или спад общегодового количества суммарной загрузки ОНМК у некоторых госпиталей (b40, b 26). <br />
+Выделим группы госпиталей: <br />
+group1 = нет пропусков gvv, bsp, b2, b15 <br />
+group2 = есть некоторые пропуски, но нет резких (кратных) скачков в общегодовом кол-ве: b3,b26 <br />
+group3 = есть некоторые пропуски, но нет резких (кратных) скачков в общегодовом кол-ве (за исключением ковидных годов 2020,2021): alm, b16, b1 <br />
+group4 = Ковидные госпиталя? b4, b38, b37, b33 <br />
+group5 =  b40, b17 <br />
+group6 = mcs <br />
+med1 - исключаем
+```{r}
+group1 <- c("gvv","bsp","b2","b15")
+group2 <- c("b3","b26")
+group3 <- c("alm","b16","b1")
+group4 <- c("b4", "b38", "b37", "b33")
+group5 <- c("b40", "b17")
+group6 <- c("mcs")
+load_data <- load_data %>% filter(hosp != "med1") %>%
+  mutate(group_hosp = ifelse(hosp %in% group1, 1,
+                             ifelse(hosp %in% group2, 2,
+                                    ifelse(hosp %in% group3, 3,
+                                           ifelse(hosp %in% group4, 4,
+                                                  ifelse(hosp %in% group5, 5,  6)))))) %>%
+  arrange(group_hosp)
+```
+
+# Динамика годового ОНМК в группах
+```{r, fig.width=15}
+
+
+ggplot() +
+  geom_line(data = load_data %>% group_by(group_hosp,hosp, year) %>% summarise(total_yearly = sum(`Суммарная_Загрузка_ОНМК`, na.rm=TRUE), .groups ="drop"), aes(x = year, y= total_yearly, colour=hosp)) +
+ geom_point(data = load_data %>% group_by(group_hosp,hosp, year) %>% summarise(total_yearly = sum(`Суммарная_Загрузка_ОНМК`, na.rm=TRUE), .groups ="drop"), aes(x = year, y= total_yearly, colour=hosp))+
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+  labs(
+    title = "Годовое количество ОНМК",
+    x = "Год",
+    y = "количество"
+  ) +
+
+  theme_minimal()+
+  theme_custom +
+  facet_wrap(vars(group_hosp), scales = "free")
+```
+
+# Пропуски по месяцам в группе 2
+
+```{r, fig.width=10}
+
+
+ggplot(load_data %>% filter(group_hosp==2), aes(x = year, y = month), color = "white") +
+  geom_tile(aes(fill = `Суммарная_Загрузка_ОНМК`)) +
+  scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+  scale_y_continuous(breaks = seq(1, 12, by = 1))+
+  geom_text(aes(label=`Суммарная_Загрузка_ОНМК`))+
+  labs(
+    title = "Суммарная_Загрузка_ОНМК по месяцам",
+    x = "Год",
+    y = "Месяц"
+  ) +
+
+  theme_minimal()+
+  theme_custom +
+  facet_wrap(vars(hosp), scales = "free")
+```
+Предложение: исключить года 2018, 2019 у b26 и 2017 у b3 (либо заполнить в той же пропроции, что и 2018, 2019 годах, сохранив общее число за 1,2 месяц)
+
+# Пропуски по месяцам в группе 3
+
+```{r, fig.height = 5, fig.width=15}
+
+
+ggplot(load_data %>% filter(group_hosp==3), aes(x = year, y = month), color = "white") +
+  geom_tile(aes(fill = `Суммарная_Загрузка_ОНМК`)) +
+  scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+  scale_y_continuous(breaks = seq(1, 12, by = 1))+
+  geom_text(aes(label=`Суммарная_Загрузка_ОНМК`))+
+  labs(
+    title = "Суммарная_Загрузка_ОНМК по месяцам",
+    x = "Год",
+    y = "Месяц"
+  ) +
+
+  theme_minimal()+
+  theme_custom +
+  facet_wrap(vars(hosp), scales = "free")
+```
+Предложение: исключить у alm 2017, 2020, 2022, <br />
+Почему у b1 есть 0? исключить 2020, 2021, 2024?
+
+# Пропуски по месяцам в группе 4
+
+```{r, fig.height = 10, fig.width=10}
+
+
+ggplot(load_data %>% filter(group_hosp==4), aes(x = year, y = month), color = "white") +
+  geom_tile(aes(fill = `Суммарная_Загрузка_ОНМК`)) +
+  scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+  scale_y_continuous(breaks = seq(1, 12, by = 1))+
+  geom_text(aes(label=`Суммарная_Загрузка_ОНМК`))+
+  labs(
+    title = "Суммарная_Загрузка_ОНМК по месяцам",
+    x = "Год",
+    y = "Месяц"
+  ) +
+
+  theme_minimal()+
+  theme_custom +
+  facet_wrap(vars(hosp), scales = "free")
+```
+Предложение:
+
+Исключить у b33 и b37 все года кроме 2019, у b38 - 2020-2022, b4 в 2017 заполнить средним за 2018-2019, исключить 2020, 2021. Тут также очень небольшие кол-ва в начале 2023-2024. Что с эти длеать?
+
+# Пропуски по месяцам в группе 5
+
+```{r, fig.height = 5, fig.width=10}
+
+
+ggplot(load_data %>% filter(group_hosp==5), aes(x = year, y = month), color = "white") +
+  geom_tile(aes(fill = `Суммарная_Загрузка_ОНМК`)) +
+  scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+  scale_y_continuous(breaks = seq(1, 12, by = 1))+
+  geom_text(aes(label=`Суммарная_Загрузка_ОНМК`))+
+  labs(
+    title = "Суммарная_Загрузка_ОНМК по месяцам",
+    x = "Год",
+    y = "Месяц"
+  ) +
+
+  theme_minimal()+
+  theme_custom +
+  facet_wrap(vars(hosp), scales = "free")
+```
+
+Предложение:
+оставить у b17 2022-2024, у b40 исключить 2020-2021, в 2017 заполнить средним за 2018-2019
+
+# Пропуски по месяцам в группе 6
+
+```{r, fig.height = 5, fig.width=5}
+
+
+ggplot(load_data %>% filter(group_hosp==6), aes(x = year, y = month), color = "white") +
+  geom_tile(aes(fill = `Суммарная_Загрузка_ОНМК`)) +
+  scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+  scale_y_continuous(breaks = seq(1, 12, by = 1))+
+  geom_text(aes(label=`Суммарная_Загрузка_ОНМК`))+
+  labs(
+    title = "Суммарная_Загрузка_ОНМК по месяцам",
+    x = "Год",
+    y = "Месяц"
+  ) +
+
+  theme_minimal()+
+  theme_custom +
+  facet_wrap(vars(hosp), scales = "free")
+```
+Предложение:
+исключить 2018, 2020-2021, в 2023 заполнить средним 7ой месяц, но сохранив общую сумму за 7 и 8.
+
+# Общие предложения по результатам анализа:
+1. Исключить госпиталь med1.
+2. Исключить из анализа года 2020-2021 у всех госпиталей групп 1,4,5 и год 2020 у группы 3 независимо от наличия/отсутствия пропусков, так как там наблюдалась аномальная динамика, связанная с пандемией коронавирусной инфекции.
+3. Исключить согласно предложениям по каждому госпиталю.
+4. Необходимо принять решения по вопросам.
