@@ -1,0 +1,150 @@
+---
+title: "ARIMAX time series regression"
+author: "Victoria Zaitceva"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(lubridate)
+library(tseries)
+library(forecast)
+
+
+data <- read.table("data/data_summarized_by_month_filled_all_variables.tsv", header = TRUE, sep = "\t")
+```
+
+```{r}
+data_prepared <- data %>%
+  mutate(
+    year_month = anytime::anydate(paste0(year, "-", sprintf("%02d", month), "-01"))
+  ) %>%
+  group_by(year_month) %>%
+  summarise(
+    lethal_outcomes_perc = sum(Летальные_Исходы, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    ishemic_stroke_perc = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    gem_stroke_perc = sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    age60_perc = sum(Старше_60_лет, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    severeNIHSSS_perc = sum(NIHSS_Больше_21, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    ii_therapeutic_window_perc = sum(ИИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
+    gi_therapeutic_window_perc = sum(ГИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) * 100,
+    total_therapeutic_window_perc = sum(Терапевтическое_Окно_4_5ч, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    thromb_perc = sum(Тромболизис, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
+    total_treated = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
+    total_load = sum(Суммарная_Загрузка_ОНМК, na.rm = TRUE),
+    #total_not_treated = total_load - total_treated, # try instead of total load - didn't help
+    .groups = "drop"
+  )
+```
+
+
+
+```{r}
+str(data_prepared)
+```
+
+# ARIMAX
+
+ARIMA with exogenous regressors (ARIMAX)
+
+## Data preparation
+
+```{r}
+# Convert the dependent variable (Deaths) into a time series object
+deaths_ts <- ts(data_prepared$lethal_outcomes_perc, start = c(2017, 1), frequency = 12)  # Monthly data
+
+```
+
+
+```{r}
+# Save the independent variables
+kpis <- data_prepared[, c("ishemic_stroke_perc", "gem_stroke_perc", "age60_perc", "severeNIHSSS_perc", 
+                          "total_therapeutic_window_perc", "thromb_perc", "total_treated" ,"total_load")]
+kpis <- as.data.frame(lapply(kpis, as.numeric))
+# Convert KPIs to a numeric matrix
+kpis_matrix <- as.matrix(kpis)
+
+```
+
+
+## Stationarity test
+
+```{r}
+
+deaths_ts <- na.omit(deaths_ts)
+
+# Test for stationarity 
+adf.test(deaths_ts)
+# p-value = 0.2 - data is not stationary
+
+# If p-value > 0.05, differencing is needed
+# Apply differencing to make the series stationary
+deaths_diff <- diff(deaths_ts)
+adf.test(deaths_diff)
+# p-value = 0.01 - data is stationary, we can use ARIMA model
+
+
+```
+## Model estimation
+
+```{r}
+
+# Ensure the lengths of deaths_ts and kpis_matrix match
+if (length(deaths_ts) != nrow(kpis_matrix)) {
+  kpis_matrix <- kpis_matrix[-1, ]  # Align KPIs with the differenced time series
+}
+
+
+
+```
+
+
+```{r}
+
+arimax_model <- auto.arima(deaths_ts, d = 1, xreg = kpis_matrix)
+
+summary(arimax_model)
+```
+
+
+t-statistic = estimate / standard error
+if smaller than |1.96|, then the variable is not significant
+
+
+ishemic_stroke_perc	-0.2926	/0.0852	= -3.43	Yes
+total_treated	0.0047 /	0.0023 =	2.04	Yes
+
+The rest of the variables are not significant
+
+ACF1 in the output: 0.0778
+This value measures the lag-1 autocorrelation of residuals.
+A value close to 0 indicates minimal autocorrelation.
+For practical purposes, ∣ACF1∣<0.2 is typically considered low enough to conclude no substantial autocorrelation.
+
+## Model diagnostics
+
+```{r}
+# Residual diagnostics
+checkresiduals(arimax_model)
+
+```
+
+1. Residuals should fluctuate randomly around zero.
+
+2. ACF plot
+No significant spikes (beyond the dashed line) indicate minimal autocorrelation
+
+3. Histogram
+Residuals should be normally distributed - kind of
+
+4. Ljung-Box Test
+Ljung-Box Test  tests the null hypothesis that residuals are independently distributed.
+
+```{r}
+Box.test(residuals(arimax_model), lag = 10, type = "Ljung-Box")
+
+```
+p>0.05: Fail to reject the null, indicating no significant autocorrelation.
