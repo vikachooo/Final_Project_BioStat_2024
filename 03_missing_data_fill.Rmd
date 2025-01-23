@@ -22,6 +22,8 @@ library(gtsummary)
 library(readr)
 library(dplyr)
 library(mice)
+library(miceRanger)
+
 
 theme_custom <- theme(
   panel.background = element_rect(fill = "white"),
@@ -40,121 +42,227 @@ database_summarized_month <- read_tsv("data/data_summarized_by_month.tsv")
 
 # вектор наименований переменных, пропуски которых мы будем заполнять
 
+
+hosp_full <- c("gvv", "bsp", "b2", "b15")
+
 var_proc <- c("Суммарная_Загрузка_ОНМК","Суммарно_Госпитализировано","Тромболизис","Летальные_Исходы", "Пролечены_с_ОНМК_Всего", "ИИ_Ишемический_Инсульт", "ГИ_Геморрагический_Инсульт",  "Старше_60_лет",
               "NIHSS_Больше_21", "Терапевтическое_Окно_4_5ч")
 
+
 ```
 
-# Этап 1. Заменим на NA месяцы, которые вероятнее всего включают в себя данные за предыдущие пропущенные месяцы (по данным Суммарная_Загрузка_ОНМК)
+# Этап. Заменим на NA месяцы, которые являются выбросами  
 
 ```{r}
-cum_month <-data.frame(matrix(ncol=5,nrow=0, dimnames=list(NULL, c("hosp", "year", "month_cum", "month_start", "month_end"))))
-cum_month <- rbind(cum_month, data.frame(hosp = "b26",
-                                         year = 2018,
-                                         month_cum = 3,
-                                         month_start = 1,
-                                         month_end = 2 
-))
-cum_month <- rbind(cum_month, data.frame(hosp = "b3",
-                                         year = 2017,
-                                         month_cum = 2,
-                                         month_start = 1,
-                                         month_end = 1 
-))
-cum_month <- rbind(cum_month, data.frame(hosp = "alm",
-                                         year = 2017,
-                                         month_cum = 10,
-                                         month_start = 1,
-                                         month_end = 9 
-))
-cum_month <- rbind(cum_month, data.frame(hosp = "b37",
-                                         year = 2017,
-                                         month_cum = 8,
-                                         month_start = 1,
-                                         month_end = 7 
-))
-cum_month <- rbind(cum_month, data.frame(hosp = "b37",
-                                         year = 2018,
-                                         month_cum = 8,
-                                         month_start = 1,
-                                         month_end = 7 
-))
-cum_month <- rbind(cum_month, data.frame(hosp = "b37",
-                                         year = 2022,
-                                         month_cum = 9,
-                                         month_start = 1,
-                                         month_end = 8 
-))
-cum_month <- rbind(cum_month, data.frame(hosp = "b37",
-                                         year = 2024,
-                                         month_cum = 7,
-                                         month_start = 3,
-                                         month_end = 6 
-))
-cum_month <- rbind(cum_month, data.frame(hosp = "b17",
-                                         year = 2017,
-                                         month_cum = 10,
-                                         month_start = 1,
-                                         month_end = 9 
-))
-cum_month <- rbind(cum_month, data.frame(hosp = "b17",
-                                         year = 2018,
-                                         month_cum = 3,
-                                         month_start = 1,
-                                         month_end = 2 
-))
-cum_month <- rbind(cum_month, data.frame(hosp = "b17",
-                                         year = 2019,
-                                         month_cum = 9,
-                                         month_start = 1,
-                                         month_end = 8 
-))
-cum_month <- rbind(cum_month, data.frame(hosp = "b40",
-                                         year = 2021,
-                                         month_cum = 11,
-                                         month_start = 2,
-                                         month_end = 10 
-))
-cum_month <- rbind(cum_month, data.frame(hosp = "mcs",
-                                         year = 2023,
-                                         month_cum = 8,
-                                         month_start = 7,
-                                         month_end = 7 
-))
+#cum_month <-data.frame(matrix(ncol=5,nrow=0, dimnames=list(NULL, c("hosp", "year", "month_cum", "month_start", "month_end"))))
+#cum_month <- rbind(cum_month, data.frame(hosp = "b26",
+#                                         year = 2018,
+#                                         month_cum = 3,
+#                                         month_start = 1,
+#                                         month_end = 2 
+#))
+#cum_month <- rbind(cum_month, data.frame(hosp = "b3",
+#                                         year = 2017,
+#                                         month_cum = 2,
+#                                         month_start = 1,
+#                                         month_end = 1 
+#))
+#cum_month <- rbind(cum_month, data.frame(hosp = "alm",
+#                                         year = 2017,
+#                                         month_cum = 10,
+#                                         month_start = 1,
+#                                         month_end = 9 
+#))
+#cum_month <- rbind(cum_month, data.frame(hosp = "b37",
+#                                         year = 2017,
+#                                         month_cum = 8,
+#                                         month_start = 1,
+#                                         month_end = 7 
+#))
+#cum_month <- rbind(cum_month, data.frame(hosp = "b37",
+#                                         year = 2018,
+#                                         month_cum = 8,
+#                                         month_start = 1,
+#                                         month_end = 7 
+#))
+#cum_month <- rbind(cum_month, data.frame(hosp = "b37",
+#                                         year = 2022,
+#                                         month_cum = 9,
+#                                         month_start = 1,
+#                                         month_end = 8 
+#))
+#cum_month <- rbind(cum_month, data.frame(hosp = "b37",
+#                                         year = 2024,
+#                                         month_cum = 7,
+#                                         month_start = 3,
+#                                         month_end = 6 
+#))
+#cum_month <- rbind(cum_month, data.frame(hosp = "b17",
+#                                         year = 2017,
+#                                         month_cum = 10,
+#                                         month_start = 1,
+#                                         month_end = 9 
+#))
+#cum_month <- rbind(cum_month, data.frame(hosp = "b17",
+#                                         year = 2018,
+#                                         month_cum = 3,
+#                                         month_start = 1,
+#                                         month_end = 2 
+#))
+#cum_month <- rbind(cum_month, data.frame(hosp = "b17",
+#                                         year = 2019,
+#                                         month_cum = 9,
+#                                         month_start = 1,
+#                                         month_end = 8 
+#))
+#cum_month <- rbind(cum_month, data.frame(hosp = "b40",
+#                                         year = 2021,
+#                                         month_cum = 11,
+#                                         month_start = 2,
+#                                         month_end = 10 
+#))
+#cum_month <- rbind(cum_month, data.frame(hosp = "mcs",
+#                                         year = 2023,
+#                                         month_cum = 8,
+#                                         month_start = 7,
+#                                         month_end = 7 
+#))
 
 
 
-cum_month
-```
-
-```{r}
+# cum_month
 database_summarized_month_corr <- database_summarized_month %>%
   filter(hosp != "med1")
-for (name in var_proc)
-{
-  #name <- c("Суммарная_Загрузка_ОНМК")
-  i_col <- match(name, colnames(database_summarized_month_corr))
-  for (i in 1:nrow(cum_month))
-  {
-    database_summarized_month_corr[database_summarized_month_corr$hosp == cum_month$hosp[i] & database_summarized_month_corr$year == cum_month$year[i] & database_summarized_month_corr$month == cum_month$month_cum[i], i_col] <- NA
-  }
-}
 ```
 
-# Этап 2. Проведем Little's test для оценки характера пропусков
 
 ```{r}
-hosp_full <- c("gvv", "bsp", "b2", "b15")
+#for (name in var_proc)
+#{
+#name <- c("Суммарная_Загрузка_ОНМК")
+#  i_col <- match(name, colnames(database_summarized_month_corr))
+#  for (i in 1:nrow(cum_month))
+#  {
+#    database_summarized_month_corr[database_summarized_month_corr$hosp == #cum_month$hosp[i] & database_summarized_month_corr$year == cum_month$year[i] & #database_summarized_month_corr$month == cum_month$month_cum[i], i_col] <- NA
+#  }
+#}
+```
 
-hosp_all <- unique(database_summarized_month_corr$hosp)
+## Анализ выбросов
 
-# delete med1
-#hosp_all <- hosp_all[! hosp_all %in% c("med1")]
+1. не включаем 2020 и 2021 при определении выбросов
+2. посчитаем процент пропущенных значений в зависимости от порога для выбросов (1.5 и 3 IQR)
+
+**Выбор** Устанавливаем 3IQR для определения выбросов
+
+```{r, fig.width = 8}
+#name <- c("Суммарная_Загрузка_ОНМК")
+#i_col <- match(name, colnames(database_summarized_month_corr))
 
 for (name in var_proc)
 {
   
-  mcar_test_results <-data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("hosp", "p-value", "MCAR_MAR"))))
+  i_col <- match(name, colnames(database_summarized_month_corr))
+  
+  # построим боксплоты распределение кол-ва по месяцев в нековидные и ковидные года
+  pl <- database_summarized_month_corr %>% select(hosp, year, !!name) %>%
+    filter(! hosp %in% hosp_full) %>%
+    mutate(covid = factor(ifelse(year == 2020 | year == 2021, 1,0), levels=c(0,1), labels=c("No", "Yes"))) %>% rename(value = !!name) %>%
+    ggplot()+
+    geom_boxplot(aes(x=covid, y=value, fill = covid), outliers = TRUE, show.legend=TRUE, na.rm=TRUE, coef=1.5)+
+    #geom_jitter(aes(x=covid, y=value, fill = covid))+
+    scale_fill_brewer(palette = "YlOrRd") +
+    scale_x_discrete(name = "Covid year")+
+    scale_y_continuous(name = "Amount")+
+    facet_wrap(vars(hosp), scales = "free_y")+
+    labs(title = name)+
+    theme_custom
+  
+  
+  # определим выбросы 1.5*iqr
+  outliers1_5 <- database_summarized_month_corr %>% select(hosp, year, !!name) %>%
+    filter(! hosp %in% hosp_full) %>%
+    mutate(covid = factor(ifelse(year == 2020 | year == 2021, 1,0), levels=c(0,1), labels=c("No", "Yes"))) %>% rename(value = !!name) %>% filter(covid=="No") %>%
+    select(hosp, value) %>%
+    group_by(hosp) %>%
+    summarise(boxplot= list(setNames(boxplot.stats(value, coef=1.5)$stats,                          c('lower_whisker','lower_hinge','median','upper_hinge','upper_whisker') ) ) ) %>%
+    unnest_wider(boxplot)
+  
+  # определим выбросы 3*iqr
+  
+  outliers3 <- database_summarized_month_corr %>% select(hosp, year, !!name) %>%
+    filter(! hosp %in% hosp_full) %>%
+    mutate(covid = factor(ifelse(year == 2020 | year == 2021, 1,0), levels=c(0,1), labels=c("No", "Yes"))) %>% rename(value = !!name) %>% filter(covid=="No") %>%
+    select(hosp, value) %>%
+    group_by(hosp) %>%
+    summarise(boxplot= list(setNames(boxplot.stats(value, coef=3)$stats,                          c('lower_whisker','lower_hinge','median','upper_hinge','upper_whisker') ) ) ) %>%
+    unnest_wider(boxplot)
+  
+  #outliers1_5
+  #outliers3
+  
+  proc_NA_orig <- database_summarized_month_corr %>% select(hosp, !!name) %>%
+    rename(value = !!name) %>%
+    group_by(hosp) %>%
+    summarise("%_NA" = round(100*(sum(is.na(value))-2)/length(value)))
+  
+  
+  change2NA <- function(temp, outliers, i_col, hosp_excl)
+  {
+    for (i in 1:nrow(temp))
+    { up_l <- outliers$upper_whisker[outliers$hosp == temp$hosp[i]]
+    low_l <- outliers$lower_whisker[outliers$hosp == temp$hosp[i]]
+    if ( (! temp$hosp[i] %in% hosp_excl) & !is.na(temp[i, i_col]) & (temp[i, i_col] > up_l | temp[i, i_col] < low_l))
+    {
+      temp[i, i_col]<-NA
+    }
+    }
+    result <- temp
+  }
+  
+  
+  proc_NA_1_5 <- change2NA(database_summarized_month_corr, outliers1_5, i_col, hosp_full) %>% select(hosp, !!name) %>%
+    rename(value = !!name) %>%
+    group_by(hosp) %>%
+    summarise("%_NA_1_5IQR" = round(100*(sum(is.na(value))-2)/length(value)))
+  
+  proc_NA_3 <- change2NA(database_summarized_month_corr, outliers3, i_col, hosp_full) %>% select(hosp, !!name) %>%
+    rename(value = !!name) %>%
+    group_by(hosp) %>%
+    summarise("%_NA_3IQR" = round(100*(sum(is.na(value))-2)/length(value)))
+  
+  pl1 <- merge(merge(proc_NA_orig, proc_NA_3, by = "hosp"), proc_NA_1_5, by = "hosp") %>%
+    filter (! hosp %in% hosp_full) %>%
+    reshape2::melt() %>%
+    ggplot(aes(x=hosp, y=value, fill = variable))+
+    geom_bar(position = "dodge", stat = "identity")+
+    geom_hline(yintercept=30, linetype='dotted', col = 'red')+
+    scale_y_continuous(name = "NA's percentage")+
+    labs(title = name)+
+    theme_custom
+  
+# Заменим выбросы на NAs
+database_summarized_month_corr <- change2NA(database_summarized_month_corr, outliers3, i_col, hosp_full)
+  
+  print(pl)
+  print(pl1) 
+}
+
+
+```
+
+# Этап. Проведем Little's test для оценки характера пропусков
+
+```{r}
+
+
+hosp_all <- unique(database_summarized_month_corr$hosp)
+
+
+for (name in var_proc)
+{
+  
+  mcar_test_results <-data.frame(matrix(ncol=3,nrow=0, dimnames=list(NULL, c("hosp", "p-value", "MCAR"))))
   
   for (h in hosp_all)
   {
@@ -166,7 +274,7 @@ for (name in var_proc)
                                        select(c(year, month, !!name)))
       #print(h)
       #print(round(test_mcar$p.value,digits = 4))
-      mcar_test_results <- rbind(mcar_test_results, data.frame(hosp= h,p_value=test_mcar$p.value, MCAR_MAR= ifelse(test_mcar$p.value < 0.05, "MAR","MCAR")))
+      mcar_test_results <- rbind(mcar_test_results, data.frame(hosp= h,p_value=test_mcar$p.value, MCAR= ifelse(test_mcar$p.value < 0.05, "no","yes")))
       
     }
   }
@@ -176,7 +284,7 @@ for (name in var_proc)
 }
 ```
 
-# Этап 3. Заполнение пропусков методом MICE
+# Этап. MICE (для каждого госпиталя по отдельности)
 
 ```{r}
 database_summarized_month_filled <- database_summarized_month_corr
@@ -207,14 +315,13 @@ for (name in var_proc)
     
     rm(temp)
     
-    
+    #print(plot(imp,c(name)))
   }
 }
 
-```
 
 # Этап 4. Коррекция заполненных пропусков, чтобы общая сумма равнялась значению месяца, заполненному NA на Этапе1
-```{r}
+
 for (name in var_proc)
 {
   # индекс колонки, с данными которой мы работаем
@@ -222,504 +329,668 @@ for (name in var_proc)
   i_col_m <- match(name, colnames(database_summarized_month))
   
   
-  for (i in 1:nrow(cum_month))
-  {
+#  for (i in 1:nrow(cum_month))
+#  {
     # сумма за пропущенные месяца после заполнения пропусков
-    c_sum <- sum(database_summarized_month_filled[database_summarized_month_filled$hosp == cum_month$hosp[i] & database_summarized_month_filled$year == cum_month$year[i] & database_summarized_month_filled$month <= cum_month$month_cum[i] & database_summarized_month_filled$month >= cum_month$month_start[i],i_col_f], na.rm = TRUE)
+#    c_sum <- sum(database_summarized_month_filled[database_summarized_month_filled$hosp == cum_month$hosp[i] & database_summarized_month_filled$year == cum_month$year[i] & database_summarized_month_filled$month <= cum_month$month_cum[i] & database_summarized_month_filled$month >= cum_month$month_start[i],i_col_f], na.rm = TRUE)
     
-    database_summarized_month_filled[database_summarized_month_filled$hosp == cum_month$hosp[i] & database_summarized_month_filled$year == cum_month$year[i] & database_summarized_month_filled$month == cum_month$month_cum[i], i_col_f] <- 
+#    database_summarized_month_filled[database_summarized_month_filled$hosp == cum_month$hosp[i] & database_summarized_month_filled$year == cum_month$year[i] & database_summarized_month_filled$month == cum_month$month_cum[i], i_col_f] <- 
       #текущее значение последнего месяцав периода пропусков
-      database_summarized_month_filled[database_summarized_month_filled$hosp == cum_month$hosp[i] & database_summarized_month_filled$year == cum_month$year[i] & database_summarized_month_filled$month == cum_month$month_cum[i], i_col_f] -
+#      database_summarized_month_filled[database_summarized_month_filled$hosp == cum_month$hosp[i] & database_summarized_month_filled$year == cum_month$year[i] & database_summarized_month_filled$month == cum_month$month_cum[i], i_col_f] -
       #корректировка значения последнего месяца периода пропусков с помощью разницы текущей суммы за все пропущенные месяцы и исходного значения последнего месяца периода пропуска
-      (c_sum - as.numeric(database_summarized_month[database_summarized_month$hosp == cum_month$hosp[i] & database_summarized_month$year == cum_month$year[i] & database_summarized_month$month == cum_month$month_cum[i], i_col_m]))
+#      (c_sum - as.numeric(database_summarized_month[database_summarized_month$hosp == cum_month$hosp[i] & database_summarized_month$year == cum_month$year[i] & database_summarized_month$month == cum_month$month_cum[i], i_col_m]))
     
-  }
+#  }
   
   # Вернем  NA в месяцы 11 и 12 2024 года
   database_summarized_month_filled[database_summarized_month_filled$year == 2024 & database_summarized_month_filled$month <= 12 & database_summarized_month_filled$month >= 11, i_col_f] <- NA
 }
-```
 
-```{r}
 # сохраним результаты
 write_tsv(database_summarized_month_filled, "data/data_summarized_by_month_filled.tsv")
 ```
 
-# Этап 5. Визуализация результатов
+## Визуализация результатов
 
-```{r, echo = FALSE, results = "asis", fig.width=12}
+```{r}
+plot_result <- function(h,name)
+{
+  temp1 <- database_summarized_month %>%
+    filter(hosp != "med1") %>% 
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name)
+  temp1$miss_d <- "0_original"
+  
+  temp2 <- database_summarized_month_corr %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name)
+  temp2$miss_d <- "1_corrected"
+  
+  temp3 <- database_summarized_month_filled %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name)
+  temp3$miss_d <- "2_filled"
+  
+  data <- rbind(temp1,temp2,temp3)
+  rm(temp1, temp2, temp3)
+  
+  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
+    geom_tile(aes(fill = values)) +
+    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
+    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+    scale_y_continuous(breaks = seq(1, 12, by = 1))+
+    geom_text(aes(label=values))+
+    labs(
+      title = paste0(h),
+      x = "Год",
+      y = "Месяц"
+    ) +
+    
+    theme_minimal()+
+    theme_custom +
+    facet_wrap(vars(miss_d), scales = "free")
+  
+  result <- pl
+}
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[1]
+
+cat("\n### ", name, "\n")
+for (h in hosp_all)
+{ 
+  print(plot_result(h,name))
+}
+
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[2]
+
+cat("\n### ", name, "\n")
+for (h in hosp_all)
+{ 
+  print(plot_result(h,name))
+}
+
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[3]
+
+cat("\n### ", name, "\n")
+for (h in hosp_all)
+{ 
+  print(plot_result(h,name))
+}
+
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[4]
+
+cat("\n### ", name, "\n")
+for (h in hosp_all)
+{ 
+  print(plot_result(h,name))
+}
+
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[5]
+
+cat("\n### ", name, "\n")
+for (h in hosp_all)
+{ 
+  print(plot_result(h,name))
+}
+
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[6]
+
+cat("\n### ", name, "\n")
+for (h in hosp_all)
+{ 
+  print(plot_result(h,name))
+}
+
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[7]
+
+cat("\n### ", name, "\n")
+for (h in hosp_all)
+{ 
+  print(plot_result(h,name))
+}
+
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[8]
+
+cat("\n### ", name, "\n")
+for (h in hosp_all)
+{ 
+  print(plot_result(h,name))
+}
+
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[9]
+
+cat("\n### ", name, "\n")
+for (h in hosp_all)
+{ 
+  print(plot_result(h,name))
+}
+
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[10]
+
+cat("\n### ", name, "\n")
+for (h in hosp_all)
+{ 
+  print(plot_result(h,name))
+}
+
+```
+
+# Этап. MICE (учитывая переменную госпиталь)
+
+```{r, warning=FALSE}
+database_summarized_month_filled_hosp <- database_summarized_month_corr
+
+for (name in var_proc)
+{
+    imp <- mice(database_summarized_month_corr %>%
+                  #filter(hosp == h) %>% 
+                  #filter(year != 2024) %>% 
+                  select(c(year, month, hosp, !!name)),
+                maxit = 20, 
+                m = 1, 
+                seed = 30583, 
+                printFlag = FALSE)
+    
+    temp <- complete(imp, action = 1)
+    
+    database_summarized_month_filled_hosp <-
+      merge(database_summarized_month_filled_hosp, 
+            temp,
+            by = c("hosp","year","month"),
+            all.x = TRUE) %>% 
+      mutate( !!name := coalesce( !!as.name(paste0(name,".x")), !!as.name(paste0(name,".y")))) %>% select(-ends_with(".x"),-ends_with(".y"))
+    
+    rm(temp)
+    
+    
+  
+}
+
+
+# Этап 4. Коррекция заполненных пропусков, чтобы общая сумма равнялась значению месяца, заполненному NA на Этапе1
+
+for (name in var_proc)
+{
+  # индекс колонки, с данными которой мы работаем
+  i_col_f <- match(name, colnames(database_summarized_month_filled_hosp))
+  i_col_m <- match(name, colnames(database_summarized_month))
+  
+  
+#  for (i in 1:nrow(cum_month))
+#  {
+    # сумма за пропущенные месяца после заполнения пропусков
+#    c_sum <- sum(database_summarized_month_filled[database_summarized_month_filled$hosp == cum_month$hosp[i] & database_summarized_month_filled$year == cum_month$year[i] & database_summarized_month_filled$month <= cum_month$month_cum[i] & database_summarized_month_filled$month >= cum_month$month_start[i],i_col_f], na.rm = TRUE)
+    
+#    database_summarized_month_filled[database_summarized_month_filled$hosp == cum_month$hosp[i] & database_summarized_month_filled$year == cum_month$year[i] & database_summarized_month_filled$month == cum_month$month_cum[i], i_col_f] <- 
+      #текущее значение последнего месяцав периода пропусков
+#      database_summarized_month_filled[database_summarized_month_filled$hosp == cum_month$hosp[i] & database_summarized_month_filled$year == cum_month$year[i] & database_summarized_month_filled$month == cum_month$month_cum[i], i_col_f] -
+      #корректировка значения последнего месяца периода пропусков с помощью разницы текущей суммы за все пропущенные месяцы и исходного значения последнего месяца периода пропуска
+#      (c_sum - as.numeric(database_summarized_month[database_summarized_month$hosp == cum_month$hosp[i] & database_summarized_month$year == cum_month$year[i] & database_summarized_month$month == cum_month$month_cum[i], i_col_m]))
+    
+#  }
+  
+  # Вернем  NA в месяцы 11 и 12 2024 года
+  database_summarized_month_filled_hosp[database_summarized_month_filled_hosp$year == 2024 & database_summarized_month_filled_hosp$month <= 12 & database_summarized_month_filled_hosp$month >= 11, i_col_f] <- NA
+}
+
+# сохраним результаты
+write_tsv(database_summarized_month_filled_hosp, "data/data_summarized_by_month_filled_hosp.tsv")
+```
+
+## Визуализация результатов
+
+```{r}
+plot_res_hosp <- function(h,name)
+{
+  temp1 <- database_summarized_month %>%
+    filter(hosp != "med1") %>% 
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name)
+  temp1$miss_d <- "0_original"
+  
+  temp2 <- database_summarized_month_corr %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name)
+  temp2$miss_d <- "1_corrected"
+  
+  temp3 <- database_summarized_month_filled_hosp %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name)
+  temp3$miss_d <- "2_filled"
+  
+  data <- rbind(temp1,temp2,temp3)
+  rm(temp1, temp2, temp3)
+  
+  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
+    geom_tile(aes(fill = values)) +
+    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
+    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+    scale_y_continuous(breaks = seq(1, 12, by = 1))+
+    geom_text(aes(label=values))+
+    labs(
+      title = paste0(h),
+      x = "Год",
+      y = "Месяц"
+    ) +
+    
+    theme_minimal()+
+    theme_custom +
+    facet_wrap(vars(miss_d), scales = "free")
+  
+  result <- pl
+}
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[1]
+cat("\n### ", name, "\n")
+
+
+for (h in hosp_all)
+{ 
+  
+  print(plot_res_hosp(h,name))
+}
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[2]
+cat("\n### ", name, "\n")
+
+
+for (h in hosp_all)
+{ 
+  
+  print(plot_res_hosp(h,name))
+}
+```
+
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[3]
+cat("\n### ", name, "\n")
+
+
+for (h in hosp_all)
+{ 
+  
+  print(plot_res_hosp(h,name))
+}
+```
+
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[4]
+cat("\n### ", name, "\n")
+
+
+for (h in hosp_all)
+{ 
+  
+  print(plot_res_hosp(h,name))
+}
+```
+
+
+
+# Визуализация разницы
+
+```{r}
+plot_diff <- function(h,name)
+{
+  temp1 <- database_summarized_month_filled %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name)
+  temp1$miss_d <- "1_filled"
+  
+  temp2 <- database_summarized_month_filled_hosp %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name)
+  temp2$miss_d <- "2_filled_hosp"
+  
+  temp_mask <- database_summarized_month_corr %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name) %>%
+    mutate(values = ifelse(is.na(values), 1,NA))
+  
+  
+  temp3 <- temp1 %>% inner_join(temp2, by = c("hosp", "year", "month")) %>%
+    transmute(hosp, year, month, values = values.x - values.y)
+  temp3 <- temp3 %>% inner_join(temp_mask, by = c("hosp", "year", "month")) %>%
+    transmute(hosp, year, month, values = values.x*values.y)
+  temp3$miss_d <- "3_diff"
+  
+  data <- rbind(temp1, temp2, temp3)
+  rm(temp1,temp2, temp3)
+  
+  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
+    geom_tile(aes(fill = values)) +
+    scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, name = "Месячное кол-во") +
+    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+    scale_y_continuous(breaks = seq(1, 12, by = 1))+
+    geom_text(aes(label=values))+
+    labs(
+      title = paste0(h),
+      x = "Год",
+      y = "Месяц"
+    ) +
+    
+    theme_minimal()+
+    theme_custom +
+    facet_wrap(vars(miss_d), scales = "free")
+  
+  result <-pl
+}
+```
+
+```{r, echo = FALSE, warning=FALSE, results = "asis", fig.width=12}
 name <- var_proc[1]
 cat("\n## ", name, "\n")
 
 
 for (h in hosp_all)
 { 
-  temp1 <- database_summarized_month %>%
-    filter(hosp != "med1") %>% 
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp1$miss_d <- "0_original"
-  
-  temp2 <- database_summarized_month_corr %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp2$miss_d <- "1_corrected"
-  
-  temp3 <- database_summarized_month_filled %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp3$miss_d <- "2_filled"
-  
-  data <- rbind(temp1,temp2,temp3)
-  rm(temp1, temp2, temp3)
-  
-  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
-    geom_tile(aes(fill = values)) +
-    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
-    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
-    scale_y_continuous(breaks = seq(1, 12, by = 1))+
-    geom_text(aes(label=values))+
-    labs(
-      title = paste0(h),
-      x = "Год",
-      y = "Месяц"
-    ) +
-    
-    theme_minimal()+
-    theme_custom +
-    facet_wrap(vars(miss_d), scales = "free")
-  print(pl)
+  print(plot_diff(h,name))
 }
-
 ```
 
-```{r, echo = FALSE, results = "asis", fig.width=12}
+
+```{r, echo = FALSE, warning=FALSE, results = "asis", fig.width=12}
 name <- var_proc[2]
 cat("\n## ", name, "\n")
 
 
 for (h in hosp_all)
 { 
-  temp1 <- database_summarized_month %>%
-    filter(hosp != "med1") %>% 
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp1$miss_d <- "0_original"
-  
-  temp2 <- database_summarized_month_corr %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp2$miss_d <- "1_corrected"
-  
-  temp3 <- database_summarized_month_filled %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp3$miss_d <- "2_filled"
-  
-  data <- rbind(temp1,temp2,temp3)
-  rm(temp1, temp2, temp3)
-  
-  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
-    geom_tile(aes(fill = values)) +
-    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
-    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
-    scale_y_continuous(breaks = seq(1, 12, by = 1))+
-    geom_text(aes(label=values))+
-    labs(
-      title = paste0(h),
-      x = "Год",
-      y = "Месяц"
-    ) +
-    
-    theme_minimal()+
-    theme_custom +
-    facet_wrap(vars(miss_d), scales = "free")
-  print(pl)
+  print(plot_diff(h,name))
 }
-
 ```
 
-```{r, echo = FALSE, results = "asis", fig.width=12}
+
+```{r, echo = FALSE, warning=FALSE, results = "asis", fig.width=12}
 name <- var_proc[3]
 cat("\n## ", name, "\n")
 
 
 for (h in hosp_all)
 { 
-  temp1 <- database_summarized_month %>%
-    filter(hosp != "med1") %>% 
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp1$miss_d <- "0_original"
-  
-  temp2 <- database_summarized_month_corr %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp2$miss_d <- "1_corrected"
-  
-  temp3 <- database_summarized_month_filled %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp3$miss_d <- "2_filled"
-  
-  data <- rbind(temp1,temp2,temp3)
-  rm(temp1, temp2, temp3)
-  
-  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
-    geom_tile(aes(fill = values)) +
-    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
-    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
-    scale_y_continuous(breaks = seq(1, 12, by = 1))+
-    geom_text(aes(label=values))+
-    labs(
-      title = paste0(h),
-      x = "Год",
-      y = "Месяц"
-    ) +
-    
-    theme_minimal()+
-    theme_custom +
-    facet_wrap(vars(miss_d), scales = "free")
-  print(pl)
+  print(plot_diff(h,name))
 }
-
 ```
 
-```{r, echo = FALSE, results = "asis", fig.width=12}
+
+```{r, echo = FALSE, warning=FALSE, results = "asis", fig.width=12}
 name <- var_proc[4]
 cat("\n## ", name, "\n")
 
 
 for (h in hosp_all)
 { 
-  temp1 <- database_summarized_month %>%
-    filter(hosp != "med1") %>% 
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp1$miss_d <- "0_original"
-  
-  temp2 <- database_summarized_month_corr %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp2$miss_d <- "1_corrected"
-  
-  temp3 <- database_summarized_month_filled %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp3$miss_d <- "2_filled"
-  
-  data <- rbind(temp1,temp2,temp3)
-  rm(temp1, temp2, temp3)
-  
-  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
-    geom_tile(aes(fill = values)) +
-    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
-    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
-    scale_y_continuous(breaks = seq(1, 12, by = 1))+
-    geom_text(aes(label=values))+
-    labs(
-      title = paste0(h),
-      x = "Год",
-      y = "Месяц"
-    ) +
-    
-    theme_minimal()+
-    theme_custom +
-    facet_wrap(vars(miss_d), scales = "free")
-  print(pl)
+  print(plot_diff(h,name))
 }
-
 ```
 
+# Этап. MICE_Ranger (учитывая переменную госпиталь)
 
+```{r, warning=FALSE}
+database_summarized_month_filled_hosp_MR <- database_summarized_month_corr
 
-```{r, echo = FALSE, results = "asis", fig.width=12}
-name <- var_proc[5]
-cat("\n## ", name, "\n")
-
-
-for (h in hosp_all)
-{ 
-  temp1 <- database_summarized_month %>%
-    filter(hosp != "med1") %>% 
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp1$miss_d <- "0_original"
-  
-  temp2 <- database_summarized_month_corr %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp2$miss_d <- "1_corrected"
-  
-  temp3 <- database_summarized_month_filled %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp3$miss_d <- "2_filled"
-  
-  data <- rbind(temp1,temp2,temp3)
-  rm(temp1, temp2, temp3)
-  
-  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
-    geom_tile(aes(fill = values)) +
-    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
-    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
-    scale_y_continuous(breaks = seq(1, 12, by = 1))+
-    geom_text(aes(label=values))+
-    labs(
-      title = paste0(h),
-      x = "Год",
-      y = "Месяц"
-    ) +
+for (name in var_proc)
+{
+  set.seed(30583)  
+  imp <- miceRanger(database_summarized_month_corr %>%
+                  #filter(hosp == h) %>% 
+                  #filter(year != 2024) %>% 
+                  select(c(year, month, hosp, !!name)),
+                maxiter = 20, 
+                m = 1, 
+                verbose = FALSE)
     
-    theme_minimal()+
-    theme_custom +
-    facet_wrap(vars(miss_d), scales = "free")
-  print(pl)
+    temp <- completeData(imp)$Dataset_1
+    
+    database_summarized_month_filled_hosp_MR <-
+      merge(database_summarized_month_filled_hosp_MR, 
+            temp,
+            by = c("hosp","year","month"),
+            all.x = TRUE) %>% 
+      mutate( !!name := coalesce( !!as.name(paste0(name,".x")), !!as.name(paste0(name,".y")))) %>% select(-ends_with(".x"),-ends_with(".y"))
+    
+    rm(temp)
+    
+    
+  
 }
 
-```
 
 
 
-```{r, echo = FALSE, results = "asis", fig.width=12}
-name <- var_proc[6]
-cat("\n## ", name, "\n")
-
-
-for (h in hosp_all)
-{ 
-  temp1 <- database_summarized_month %>%
-    filter(hosp != "med1") %>% 
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp1$miss_d <- "0_original"
+for (name in var_proc)
+{
+  # индекс колонки, с данными которой мы работаем
+  i_col_f <- match(name, colnames(database_summarized_month_filled_hosp_MR))
+  i_col_m <- match(name, colnames(database_summarized_month))
   
-  temp2 <- database_summarized_month_corr %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp2$miss_d <- "1_corrected"
   
-  temp3 <- database_summarized_month_filled %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp3$miss_d <- "2_filled"
-  
-  data <- rbind(temp1,temp2,temp3)
-  rm(temp1, temp2, temp3)
-  
-  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
-    geom_tile(aes(fill = values)) +
-    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
-    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
-    scale_y_continuous(breaks = seq(1, 12, by = 1))+
-    geom_text(aes(label=values))+
-    labs(
-      title = paste0(h),
-      x = "Год",
-      y = "Месяц"
-    ) +
-    
-    theme_minimal()+
-    theme_custom +
-    facet_wrap(vars(miss_d), scales = "free")
-  print(pl)
+  # Вернем  NA в месяцы 11 и 12 2024 года
+  database_summarized_month_filled_hosp_MR[database_summarized_month_filled_hosp_MR$year == 2024 & database_summarized_month_filled_hosp_MR$month <= 12 & database_summarized_month_filled_hosp_MR$month >= 11, i_col_f] <- NA
 }
 
+# сохраним результаты
+write_tsv(database_summarized_month_filled_hosp_MR, "data/data_summarized_by_month_filled_hosp_MR.tsv")
 ```
 
-
-```{r, echo = FALSE, results = "asis", fig.width=12}
-name <- var_proc[7]
-cat("\n## ", name, "\n")
-
-
-for (h in hosp_all)
-{ 
-  temp1 <- database_summarized_month %>%
-    filter(hosp != "med1") %>% 
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp1$miss_d <- "0_original"
-  
-  temp2 <- database_summarized_month_corr %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp2$miss_d <- "1_corrected"
-  
-  temp3 <- database_summarized_month_filled %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp3$miss_d <- "2_filled"
-  
-  data <- rbind(temp1,temp2,temp3)
-  rm(temp1, temp2, temp3)
-  
-  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
-    geom_tile(aes(fill = values)) +
-    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
-    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
-    scale_y_continuous(breaks = seq(1, 12, by = 1))+
-    geom_text(aes(label=values))+
-    labs(
-      title = paste0(h),
-      x = "Год",
-      y = "Месяц"
-    ) +
-    
-    theme_minimal()+
-    theme_custom +
-    facet_wrap(vars(miss_d), scales = "free")
-  print(pl)
-}
-
-```
-
-
-
-```{r, echo = FALSE, results = "asis", fig.width=12}
-name <- var_proc[8]
-cat("\n## ", name, "\n")
-
-
-for (h in hosp_all)
-{ 
-  temp1 <- database_summarized_month %>%
-    filter(hosp != "med1") %>% 
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp1$miss_d <- "0_original"
-  
-  temp2 <- database_summarized_month_corr %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp2$miss_d <- "1_corrected"
-  
-  temp3 <- database_summarized_month_filled %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp3$miss_d <- "2_filled"
-  
-  data <- rbind(temp1,temp2,temp3)
-  rm(temp1, temp2, temp3)
-  
-  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
-    geom_tile(aes(fill = values)) +
-    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
-    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
-    scale_y_continuous(breaks = seq(1, 12, by = 1))+
-    geom_text(aes(label=values))+
-    labs(
-      title = paste0(h),
-      x = "Год",
-      y = "Месяц"
-    ) +
-    
-    theme_minimal()+
-    theme_custom +
-    facet_wrap(vars(miss_d), scales = "free")
-  print(pl)
-}
-
-```
-
-
-
-```{r, echo = FALSE, results = "asis", fig.width=12}
-name <- var_proc[9]
-cat("\n## ", name, "\n")
-
-
-for (h in hosp_all)
-{ 
-  temp1 <- database_summarized_month %>%
-    filter(hosp != "med1") %>% 
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp1$miss_d <- "0_original"
-  
-  temp2 <- database_summarized_month_corr %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp2$miss_d <- "1_corrected"
-  
-  temp3 <- database_summarized_month_filled %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp3$miss_d <- "2_filled"
-  
-  data <- rbind(temp1,temp2,temp3)
-  rm(temp1, temp2, temp3)
-  
-  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
-    geom_tile(aes(fill = values)) +
-    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
-    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
-    scale_y_continuous(breaks = seq(1, 12, by = 1))+
-    geom_text(aes(label=values))+
-    labs(
-      title = paste0(h),
-      x = "Год",
-      y = "Месяц"
-    ) +
-    
-    theme_minimal()+
-    theme_custom +
-    facet_wrap(vars(miss_d), scales = "free")
-  print(pl)
-}
-
-```
-
-
-```{r, echo = FALSE, results = "asis", fig.width=12}
-name <- var_proc[10]
-cat("\n## ", name, "\n")
-
-
-for (h in hosp_all)
-{ 
-  temp1 <- database_summarized_month %>%
-    filter(hosp != "med1") %>% 
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp1$miss_d <- "0_original"
-  
-  temp2 <- database_summarized_month_corr %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp2$miss_d <- "1_corrected"
-  
-  temp3 <- database_summarized_month_filled %>%
-    select(c(hosp, year, month, !!name)) %>%
-    rename(values = !!name)
-  temp3$miss_d <- "2_filled"
-  
-  data <- rbind(temp1,temp2,temp3)
-  rm(temp1, temp2, temp3)
-  
-  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
-    geom_tile(aes(fill = values)) +
-    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
-    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
-    scale_y_continuous(breaks = seq(1, 12, by = 1))+
-    geom_text(aes(label=values))+
-    labs(
-      title = paste0(h),
-      x = "Год",
-      y = "Месяц"
-    ) +
-    
-    theme_minimal()+
-    theme_custom +
-    facet_wrap(vars(miss_d), scales = "free")
-  print(pl)
-}
-
-```
-
+## Визуализация результатов
 
 ```{r}
-# сохраним результаты
-write_tsv(database_summarized_month_filled, "data/data_summarized_by_month_filled_all_variables.tsv")
+plot_res_hosp_MR <- function(h,name)
+{
+  temp1 <- database_summarized_month %>%
+    filter(hosp != "med1") %>% 
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name)
+  temp1$miss_d <- "0_original"
+  
+  temp2 <- database_summarized_month_corr %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name)
+  temp2$miss_d <- "1_corrected"
+  
+  temp3 <- database_summarized_month_filled_hosp_MR %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name)
+  temp3$miss_d <- "2_filled"
+  
+  data <- rbind(temp1,temp2,temp3)
+  rm(temp1, temp2, temp3)
+  
+  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
+    geom_tile(aes(fill = values)) +
+    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
+    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+    scale_y_continuous(breaks = seq(1, 12, by = 1))+
+    geom_text(aes(label=values))+
+    labs(
+      title = paste0(h),
+      x = "Год",
+      y = "Месяц"
+    ) +
+    
+    theme_minimal()+
+    theme_custom +
+    facet_wrap(vars(miss_d), scales = "free")
+  
+  result <- pl
+}
 ```
 
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[1]
+cat("\n### ", name, "\n")
+
+
+for (h in hosp_all)
+{ 
+  
+  print(plot_res_hosp_MR(h,name))
+}
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[2]
+cat("\n### ", name, "\n")
+
+
+for (h in hosp_all)
+{ 
+  
+  print(plot_res_hosp_MR(h,name))
+}
+```
+
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[3]
+cat("\n### ", name, "\n")
+
+for (h in hosp_all)
+{ 
+  
+  print(plot_res_hosp_MR(h,name))
+}
+```
+
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[4]
+cat("\n### ", name, "\n")
+
+for (h in hosp_all)
+{ 
+  
+  print(plot_res_hosp_MR(h,name))
+}
+```
+
+
+# Визуализация разницы MICE - MICERanger (учитывая переменную госпиталь)
+
+```{r}
+plot_diff_MR <- function(h,name)
+{
+  temp1 <- database_summarized_month_filled_hosp %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name)
+  temp1$miss_d <- "1_filled_hosp"
+  
+  temp2 <- database_summarized_month_filled_hosp_MR %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name)
+  temp2$miss_d <- "2_filled_hosp_MR"
+  
+  temp_mask <- database_summarized_month_corr %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name) %>%
+    mutate(values = ifelse(is.na(values), 1,NA))
+  
+  
+  temp3 <- temp1 %>% inner_join(temp2, by = c("hosp", "year", "month")) %>%
+    transmute(hosp, year, month, values = values.x - values.y)
+  temp3 <- temp3 %>% inner_join(temp_mask, by = c("hosp", "year", "month")) %>%
+    transmute(hosp, year, month, values = values.x*values.y)
+  temp3$miss_d <- "3_diff"
+  
+  data <- rbind(temp1, temp2, temp3)
+  rm(temp1,temp2, temp3)
+  
+  pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
+    geom_tile(aes(fill = values)) +
+    scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, name = "Месячное кол-во") +
+    scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+    scale_y_continuous(breaks = seq(1, 12, by = 1))+
+    geom_text(aes(label=values))+
+    labs(
+      title = paste0(h),
+      x = "Год",
+      y = "Месяц"
+    ) +
+    
+    theme_minimal()+
+    theme_custom +
+    facet_wrap(vars(miss_d), scales = "free")
+
+  
+  result <-pl
+}
+```
+
+```{r, echo = FALSE, warning=FALSE, results = "asis", fig.width=12}
+name <- var_proc[1]
+cat("\n## ", name, "\n")
+
+
+for (h in hosp_all)
+{ 
+  print(plot_diff_MR(h,name))
+}
+```
+
+```{r, echo = FALSE, warning=FALSE, results = "asis", fig.width=12}
+name <- var_proc[2]
+cat("\n## ", name, "\n")
+
+
+for (h in hosp_all)
+{ 
+  print(plot_diff_MR(h,name))
+}
+```
+
+```{r, echo = FALSE, warning=FALSE, results = "asis", fig.width=12}
+name <- var_proc[3]
+cat("\n## ", name, "\n")
+
+
+for (h in hosp_all)
+{ 
+  print(plot_diff_MR(h,name))
+}
+```
+
+```{r, echo = FALSE, warning=FALSE, results = "asis", fig.width=12}
+name <- var_proc[4]
+cat("\n## ", name, "\n")
+
+
+for (h in hosp_all)
+{ 
+  print(plot_diff_MR(h,name))
+}
+```
