@@ -31,7 +31,7 @@ theme_custom <- theme(
   plot.subtitle = element_text(size = 12, hjust = 0.5),
   strip.text = element_text(size = 10),
   axis.text = element_text(size = 10),
-  axis.title = element_text(size = 10),
+  axis.title = element_text(size = 15),
   legend.title = element_text(size = 10),
   legend.text = element_text(size = 10)
 )
@@ -993,4 +993,80 @@ for (h in hosp_all)
 { 
   print(plot_diff_MR(h,name))
 }
+```
+
+# Сравнение подходов к заполнению пропусков
+
+```{r, fig.width=16}
+data<-data.frame()
+
+for (name in var_proc)
+{
+  
+  temp0 <- database_summarized_month_corr %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name) %>%
+    group_by(hosp) %>%
+    summarize(disp=var(values, na.rm=TRUE)) %>%
+    ungroup()
+  
+  temp1 <- database_summarized_month_filled %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name) %>%
+    group_by(hosp) %>%
+    summarize(disp=var(values, na.rm=TRUE)) %>%
+    ungroup()
+  temp1$miss_d <- "1_filled"
+  
+  temp2 <- database_summarized_month_filled_hosp %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name) %>%
+    group_by(hosp) %>%
+    summarize(disp=var(values, na.rm=TRUE)) %>%
+    ungroup()
+  temp2$miss_d <- "2_filled_hosp"
+  
+  temp3 <- database_summarized_month_filled_hosp_MR %>%
+    select(c(hosp, year, month, !!name)) %>%
+    rename(values = !!name) %>%
+    group_by(hosp) %>%
+    summarize(disp=var(values, na.rm=TRUE)) %>%
+    ungroup()
+  temp3$miss_d <- "3_filled_hosp_MR"
+  
+  temp1 <- temp1 %>% inner_join(temp0, by = c("hosp")) %>%
+    transmute(hosp, miss_d, disp = disp.x*disp.y) 
+  
+  temp2 <- temp2 %>% inner_join(temp0, by = c("hosp")) %>%
+    transmute(hosp, miss_d, disp = disp.x*disp.y) 
+  
+  temp3 <- temp3 %>% inner_join(temp0, by = c("hosp")) %>%
+    transmute(hosp, miss_d, disp = disp.x*disp.y) 
+  
+  data <- base::rbind(data, base::rbind(temp1,temp2,temp3) %>% mutate(var=name))
+  
+  rm(temp0,temp1,temp2,temp3)
+  
+  # построим боксплоты распределение отношения дисперсий
+ 
+}
+
+ pl <- data %>% mutate(miss_d = case_when(
+    startsWith(miss_d, "1") ~ "MICE_w/o_hospital",
+    startsWith(miss_d, "2") ~ "MICE_with_hospital",
+    startsWith(miss_d, "3") ~ "MICERange_with_hospital")) %>%
+    ggplot() +
+    geom_boxplot(aes(x=miss_d, y=disp, fill = miss_d), outliers = FALSE, show.legend=TRUE, na.rm=TRUE)+
+    #geom_jitter(aes(x=miss_d, y=disp, fill = miss_d), outliers = FALSE)+
+    scale_fill_brewer(palette = "YlOrRd", name = "Imputation method") +
+    #scale_x_discrete(name = "Imputation method")+
+    scale_y_continuous(name = "Relative dispersion")+
+    facet_wrap(vars(var), scales = "free_y")+
+    theme_custom+
+    theme(axis.title.x=element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank())
+  
+  print(pl)
+  
 ```
