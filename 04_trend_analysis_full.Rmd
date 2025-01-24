@@ -720,5 +720,128 @@ ggplot(data_aggregated, aes(x = year_month, y = percentage, color = type)) +
   facet_wrap(vars(type), scales = "free")
 ```
 
+# Корреляционный анализ 
 
+
+## Correlation matrix
+
+
+```{r}
+
+library(ggplot2)
+library(reshape2)
+library(corrplot)
+
+
+data_prepared <- data %>%
+  mutate(year_month = anytime::anydate(paste0(year, "-", sprintf("%02d", month), "-01"))) %>%
+  group_by(year_month) %>%
+  summarise(
+    lethal_outcomes_perc = sum(Летальные_Исходы, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    ishemic_stroke_perc = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    gem_stroke_perc = sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    age60_perc = sum(Старше_60_лет, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    severeNIHSSS_prec = sum(NIHSS_Больше_21, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    ii_therapeutic_window_perc = sum(ИИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
+    gi_therapeutic_window_perc = sum(ГИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) * 100,
+    thromb_perc = sum(Тромболизис, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
+    total_treated = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
+    total_load = sum(Суммарная_Загрузка_ОНМК, na.rm = TRUE),
+    
+    .groups = "drop"
+  )
+
+
+time_series_data <- data_prepared %>%
+  select(-year_month)  # Only numeric time series columns
+
+
+cor_matrix <- cor(time_series_data, use = "pairwise.complete.obs", method = "pearson")
+
+
+cor_melted <- melt(cor_matrix)  
+cor_melted_plot <- ggplot(cor_melted, aes(Var1, Var2, fill = value)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = round(value, 2)), color = "black", size = 4) +  # Add values
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1, 1), space = "Lab", name = "Pearson r") +
+  labs(title = "Correlation matrix (all hospitals)",
+       x = "", y = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+#ggsave("images/correlation_matrix.png", cor_melted_plot)
+
+cor_melted_plot
+
+```
+## Correlation matrix for each hosp
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(anytime)
+
+
+data_prepared <- data %>%
+  mutate(
+    year_month = anytime::anydate(paste0(year, "-", sprintf("%02d", month), "-01"))
+  ) %>%
+  group_by(hosp, year_month) %>%
+  summarise(
+    lethal_outcomes_perc = sum(Летальные_Исходы, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    ishemic_stroke_perc = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    gem_stroke_perc = sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    age60_perc = sum(Старше_60_лет, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    severeNIHSSS_perc = sum(NIHSS_Больше_21, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    ii_therapeutic_window_perc = sum(ИИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
+    gi_therapeutic_window_perc = sum(ГИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) * 100,
+    thromb_perc = sum(Тромболизис, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
+    total_treated = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
+    total_load = sum(Суммарная_Загрузка_ОНМК, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Function to calculate and plot the upper triangular correlation matrix
+plot_upper_triangle <- function(hosp_name, data) {
+  # Filter data for the hospital
+  hospital_data <- data %>% filter(hosp == hosp_name) %>% select(-hosp, -year_month)
+  
+  # Calculate correlation matrix
+  cor_matrix <- cor(hospital_data, use = "pairwise.complete.obs", method = "pearson")
+  
+  # Mask the lower triangle
+  cor_matrix[lower.tri(cor_matrix, diag = FALSE)] <- NA
+  
+  # Melt the correlation matrix
+  cor_melted <- melt(cor_matrix, na.rm = TRUE)  # Remove NA entries
+  
+  # Plot
+  ggplot(cor_melted, aes(Var1, Var2, fill = value)) +
+    geom_tile(color = "white") +
+    geom_text(aes(label = round(value, 2)), color = "black", size = 4) +  # Add values
+    scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                         midpoint = 0, limit = c(-1, 1), space = "Lab", name = "Pearson r") +
+    labs(
+      title = paste("Correlation matrix for", hosp_name),
+      x = "", y = ""
+    ) +
+    theme_custom +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+# Create correlation matrix plots for each hospital
+hospitals <- unique(data_prepared$hosp)
+plots <- lapply(hospitals, function(hosp_name) {
+  plot_upper_triangle(hosp_name, data_prepared)
+})
+
+# Display the first hospital's plot as an example
+plots[[1]]
+
+#ggplot2::ggsave("images/correlation_matrix_hosp2.png", plots[[2]])
+
+```
 
