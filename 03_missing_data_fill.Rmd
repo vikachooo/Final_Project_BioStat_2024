@@ -376,14 +376,14 @@ plot_result <- function(h,name)
   
   pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
     geom_tile(aes(fill = values)) +
-    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
+    scale_fill_gradient(low = "white", high = "red", name = "Monthly amount") +
     scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
     scale_y_continuous(breaks = seq(1, 12, by = 1))+
     geom_text(aes(label=values))+
     labs(
       title = paste0(h),
-      x = "Год",
-      y = "Месяц"
+      x = "Year",
+      y = "Month"
     ) +
     
     theme_minimal()+
@@ -592,14 +592,14 @@ plot_res_hosp <- function(h,name)
   
   pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
     geom_tile(aes(fill = values)) +
-    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
+    scale_fill_gradient(low = "white", high = "red", name = "Monthly amount") +
     scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
     scale_y_continuous(breaks = seq(1, 12, by = 1))+
     geom_text(aes(label=values))+
     labs(
       title = paste0(h),
-      x = "Год",
-      y = "Месяц"
+      x = "Year",
+      y = "Month"
     ) +
     
     theme_minimal()+
@@ -660,6 +660,18 @@ for (h in hosp_all)
 }
 ```
 
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[5]
+cat("\n### ", name, "\n")
+
+
+for (h in hosp_all)
+{ 
+  
+  print(plot_res_hosp(h,name))
+}
+```
+
 
 
 # Визуализация разницы
@@ -694,14 +706,14 @@ plot_diff <- function(h,name)
   
   pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
     geom_tile(aes(fill = values)) +
-    scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, name = "Месячное кол-во") +
+    scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, name = "Monthly amount") +
     scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
     scale_y_continuous(breaks = seq(1, 12, by = 1))+
     geom_text(aes(label=values))+
     labs(
       title = paste0(h),
-      x = "Год",
-      y = "Месяц"
+      x = "Year",
+      y = "Month"
     ) +
     
     theme_minimal()+
@@ -758,6 +770,18 @@ for (h in hosp_all)
   print(plot_diff(h,name))
 }
 ```
+
+```{r, echo = FALSE, warning=FALSE, results = "asis", fig.width=12}
+name <- var_proc[5]
+cat("\n## ", name, "\n")
+
+
+for (h in hosp_all)
+{ 
+  print(plot_diff(h,name))
+}
+```
+
 
 # Этап. MICE_Ranger (учитывая переменную госпиталь)
 
@@ -834,14 +858,14 @@ plot_res_hosp_MR <- function(h,name)
   
   pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
     geom_tile(aes(fill = values)) +
-    scale_fill_gradient(low = "white", high = "red", name = "Месячное кол-во") +
+    scale_fill_gradient(low = "white", high = "red", name = "Monthly amount") +
     scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
     scale_y_continuous(breaks = seq(1, 12, by = 1))+
     geom_text(aes(label=values))+
     labs(
       title = paste0(h),
-      x = "Год",
-      y = "Месяц"
+      x = "Year",
+      y = "Month"
     ) +
     
     theme_minimal()+
@@ -899,6 +923,17 @@ for (h in hosp_all)
 }
 ```
 
+```{r, echo = FALSE, results = "asis", fig.width=12, warning=FALSE}
+name <- var_proc[5]
+cat("\n### ", name, "\n")
+
+for (h in hosp_all)
+{ 
+  
+  print(plot_res_hosp_MR(h,name))
+}
+```
+
 
 # Визуализация разницы MICE - MICERanger (учитывая переменную госпиталь)
 
@@ -932,14 +967,14 @@ plot_diff_MR <- function(h,name)
   
   pl <- ggplot(data %>% filter(hosp==h), aes(x = year, y = month), color = "white") +
     geom_tile(aes(fill = values)) +
-    scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, name = "Месячное кол-во") +
+    scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0, name = "Monthly amount") +
     scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
     scale_y_continuous(breaks = seq(1, 12, by = 1))+
     geom_text(aes(label=values))+
     labs(
       title = paste0(h),
-      x = "Год",
-      y = "Месяц"
+      x = "Year",
+      y = "Month"
     ) +
     
     theme_minimal()+
@@ -995,6 +1030,18 @@ for (h in hosp_all)
 }
 ```
 
+
+```{r, echo = FALSE, warning=FALSE, results = "asis", fig.width=12}
+name <- var_proc[5]
+cat("\n## ", name, "\n")
+
+
+for (h in hosp_all)
+{ 
+  print(plot_diff_MR(h,name))
+}
+```
+
 # Сравнение подходов к заполнению пропусков
 
 ```{r, fig.width=16}
@@ -1035,13 +1082,13 @@ for (name in var_proc)
   temp3$miss_d <- "3_filled_hosp_MR"
   
   temp1 <- temp1 %>% inner_join(temp0, by = c("hosp")) %>%
-    transmute(hosp, miss_d, disp = disp.x*disp.y) 
+    transmute(hosp, miss_d, disp = disp.x/disp.y) 
   
   temp2 <- temp2 %>% inner_join(temp0, by = c("hosp")) %>%
-    transmute(hosp, miss_d, disp = disp.x*disp.y) 
+    transmute(hosp, miss_d, disp = disp.x/disp.y) 
   
   temp3 <- temp3 %>% inner_join(temp0, by = c("hosp")) %>%
-    transmute(hosp, miss_d, disp = disp.x*disp.y) 
+    transmute(hosp, miss_d, disp = disp.x/disp.y) 
   
   data <- base::rbind(data, base::rbind(temp1,temp2,temp3) %>% mutate(var=name))
   
@@ -1052,9 +1099,12 @@ for (name in var_proc)
 }
 
  pl <- data %>% mutate(miss_d = case_when(
-    startsWith(miss_d, "1") ~ "MICE_w/o_hospital",
-    startsWith(miss_d, "2") ~ "MICE_with_hospital",
-    startsWith(miss_d, "3") ~ "MICERange_with_hospital")) %>%
+    startsWith(miss_d, "1") ~ "1_MICE_intra-hospital",
+    startsWith(miss_d, "2") ~ "2_MICE_inter-hospital",
+    startsWith(miss_d, "3") ~ "3_MICERange_inter-hospital"),
+    var = if_else(
+    startsWith(var, "Пролечены"), "Number of Treated patients", var)) %>%
+    #filter(var=="Number of Treated patients") %>%
     ggplot() +
     geom_boxplot(aes(x=miss_d, y=disp, fill = miss_d), outliers = FALSE, show.legend=TRUE, na.rm=TRUE)+
     #geom_jitter(aes(x=miss_d, y=disp, fill = miss_d), outliers = FALSE)+
