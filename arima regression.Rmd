@@ -17,6 +17,14 @@ library(forecast)
 data <- read.table("data/data_summarized_by_month_filled_all_variables.tsv", header = TRUE, sep = "\t")
 ```
 
+
+data_summarized_by_month_filled_hosp_MR.tsv - nothing is significant
+data/data_summarized_by_month_filled_hosp.tsv - covid significant, thromb_perc borderline
+data/data_summarized_by_month_filled.tsv -covid borderline
+
+data/data_summarized_by_month_filled_all_variables.tsv - ishemic_stroke_perc and covid significant
+
+
 ```{r}
 data_prepared <- data %>%
   mutate(
@@ -38,6 +46,14 @@ data_prepared <- data %>%
     #total_not_treated = total_load - total_treated, # try instead of total load - didn't help
     .groups = "drop"
   )
+```
+
+COVID variable
+
+```{r}
+# 01 January 2020 - December 2021 - COVID period
+
+data_prepared$covid <- ifelse(data_prepared$year_month >= as.Date("2020-03-01") & data_prepared$year_month <= as.Date("2021-12-31"), 1, 0)
 ```
 
 
@@ -62,7 +78,7 @@ deaths_ts <- ts(data_prepared$lethal_outcomes_perc, start = c(2017, 1), frequenc
 ```{r}
 # Save the independent variables
 kpis <- data_prepared[, c("ishemic_stroke_perc", "gem_stroke_perc", "age60_perc", "severeNIHSSS_perc", 
-                          "total_therapeutic_window_perc", "thromb_perc", "total_treated" ,"total_load")]
+                          "total_therapeutic_window_perc", "thromb_perc", "total_treated" ,"total_load", "covid")]
 kpis <- as.data.frame(lapply(kpis, as.numeric))
 # Convert KPIs to a numeric matrix
 kpis_matrix <- as.matrix(kpis)
@@ -97,32 +113,55 @@ if (length(deaths_ts) != nrow(kpis_matrix)) {
   kpis_matrix <- kpis_matrix[-1, ]  # Align KPIs with the differenced time series
 }
 
-
-
-```
-
-
-```{r}
-
 arimax_model <- auto.arima(deaths_ts, d = 1, xreg = kpis_matrix)
 
 summary(arimax_model)
+
 ```
+
+
+
+
+ARIMA(0,1,2):
+
+p=0: No autoregressive terms are included.
+d=1: First differencing is applied to make the series stationary.
+q=2: Two moving average terms account for past forecast errors.
 
 
 t-statistic = estimate / standard error
 if smaller than |1.96|, then the variable is not significant
 
-
+Significant variables:
+Without COVID variable:
 ishemic_stroke_perc	-0.2926	/0.0852	= -3.43	Yes
 total_treated	0.0047 /	0.0023 =	2.04	Yes
+total_load	-0.0031 /	0.0016 = -1.94	No, but close to the threshold	
 
-The rest of the variables are not significant
+
+
+With COVID variable:
+ishemic_stroke_perc	-0.2739	/0.0838	= -3.27	Yes
+COVID = 2.9368 / 1.0725 = 2.74	Yes
+
+The rest of the variables are not significant.
+
+
+Impact of covid:
+
+The coefficient for covid is 2.9368, meaning deaths increase by approximately 2.94 units during COVID-19 periods, holding other factors constant.
+Significant t-value (2.74) suggests that the COVID-19 period has a measurable and meaningful impact on deaths.
+
+ishemic_stroke_perc (−0.2739):
+Significant negative relationship: Higher ischemic stroke percentage correlates with fewer deaths.
 
 ACF1 in the output: 0.0778
 This value measures the lag-1 autocorrelation of residuals.
 A value close to 0 indicates minimal autocorrelation.
 For practical purposes, ∣ACF1∣<0.2 is typically considered low enough to conclude no substantial autocorrelation.
+
+ma1 (−0.5998):
+Significant moving average term, indicating past forecast errors are critical for prediction.
 
 ## Model diagnostics
 
@@ -132,19 +171,112 @@ checkresiduals(arimax_model)
 
 ```
 
-1. Residuals should fluctuate randomly around zero.
+1. Residuals should fluctuate randomly around zero. The residuals fluctuate around zero, which is good and suggests the model is not biased. However, there appears to be a spike (possibly due to outliers or unusual events) around 2020, likely linked to the onset of COVID-19. No strong trends are visible, which supports the assumption that differencing has effectively removed non-stationarity.
 
-2. ACF plot
-No significant spikes (beyond the dashed line) indicate minimal autocorrelation
+2. Autocorrelation Function (ACF) plot - Correlation of residuals with their lags
+No significant spikes (beyond the dashed line) indicate minimal autocorrelation.
 
-3. Histogram
-Residuals should be normally distributed - kind of
+3. Residual Histogram
+While normality isn't strictly required for ARIMA, the approximate normality of residuals supports the validity of the model.
 
 4. Ljung-Box Test
 Ljung-Box Test  tests the null hypothesis that residuals are independently distributed.
+Slight skewness in the residual distribution could indicate some outliers 
 
 ```{r}
 Box.test(residuals(arimax_model), lag = 10, type = "Ljung-Box")
 
 ```
 p>0.05: Fail to reject the null, indicating no significant autocorrelation.
+
+
+### Refit the model only with significant variables with COVID
+
+
+```{r}
+selected_kpis <- data_prepared[, c("ishemic_stroke_perc",  "covid")]
+
+
+selected_kpis_matrix <- as.matrix(selected_kpis)
+
+
+# Ensure the lengths of deaths_ts and kpis_matrix match
+if (length(deaths_ts) != nrow(selected_kpis_matrix)) {
+  selected_kpis_matrix <- selected_kpis_matrix[-1, ]  # Align KPIs with the differenced time series
+}
+
+
+
+simplified_model_covid <- auto.arima(deaths_ts, d = 1, xreg = selected_kpis_matrix)
+
+
+summary(simplified_model_covid)
+```
+
+
+ar1 (t=2.85):
+Significant positive autoregressive term, showing that past values influence current values.
+
+ma1 (t=−12.56):
+Strongly significant moving average term, indicating the importance of past forecast errors in explaining the series.
+
+ishemic_stroke_perc (t=−4.32):
+Significant negative relationship: Higher ischemic stroke percentages correlate with fewer deaths.
+
+covid (t=3.37):
+Significant positive relationship: During COVID-19 periods (covid=1), deaths increase significantly by approximately 3.17 units, holding other factors constant.
+
+
+Training Set Error Measures
+ME	-0.0250	Minimal bias in the predictions.
+RMSE	2.2762	Improved accuracy compared to earlier models.
+MAE	1.5686	Lowest among all tested models, indicating better fit.
+MAPE	8.26%	Excellent predictive accuracy (below 10%).
+ACF1	
+0.0066	Residual autocorrelation is near zero, indicating no significant unexplained patterns.
+
+```{r}
+# Residual diagnostics
+checkresiduals(simplified_model_covid)
+```
+
+
+
+
+### Refit the model only with significant variables without COVID
+
+
+```{r}
+
+selected_kpis <- data_prepared[, c("ishemic_stroke_perc", "total_treated", "total_load")]
+
+
+selected_kpis_matrix <- as.matrix(selected_kpis)
+
+
+# Ensure the lengths of deaths_ts and kpis_matrix match
+if (length(deaths_ts) != nrow(selected_kpis_matrix)) {
+  selected_kpis_matrix <- selected_kpis_matrix[-1, ]  # Align KPIs with the differenced time series
+}
+
+
+
+simplified_model <- auto.arima(deaths_ts, d = 1, xreg = selected_kpis_matrix)
+
+
+summary(simplified_model)
+
+```
+
+ishemic_stroke_perc  = -0.2261 / 0.0620 = -3.65	Yes
+total_treated = 0.0035 / 0.0022 =  1.59	No
+total_load = -0.0024 / 0.0015 = -1.61	No
+
+
+
+
+
+
+
+
+
