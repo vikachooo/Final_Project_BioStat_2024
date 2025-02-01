@@ -54,6 +54,6 @@ Study design: Observational cohort study - STROBE guideline
 
 <br>
 <br>
-Authours: Anna Andreychenko, Anrew Kravets, Victoria Zaitceva
+Authours: Anna Andreychenko, Andrew Kravets, Victoria Zaitceva
 <br>
 Supervisors: Tatiana Charitonova, Oleg Arnaut
