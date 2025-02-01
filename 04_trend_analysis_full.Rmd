@@ -15,7 +15,7 @@ library(lubridate)
 library(zoo)
 library(patchwork)
 
-data <- read.table("data/data_summarized_by_month_filled_all_variables.tsv", header = TRUE, sep = "\t")
+data <- read.table("data/data_summarized_by_month_filled_hosp_MR.tsv", header = TRUE, sep = "\t")
 
 theme_custom <- theme(
     panel.background = element_rect(fill = "white"),
@@ -52,9 +52,57 @@ data$type <- hosp_to_type[data$hosp]
 
 # Годовая динамика в структуре заболевания (%) общегородская
 
+Первый график - просто показать, почему я не хотела объединять все в один график.
+
+
+```{r}
+
+stroke_types <- c("ИИ_Ишемический_Инсульт", "ГИ_Геморрагический_Инсульт", "ТИА_Транзиторная_Ишемическая_Атака")
+# Combine Data for All Stroke Types
+data_combined <- data %>%
+  pivot_longer(
+    cols = stroke_types,
+    names_to = "Stroke_Type",
+    values_to = "Count"
+  ) %>%
+  group_by(year, Stroke_Type) %>%
+  summarise(
+    Total_Stroke = sum(Count, na.rm = TRUE),
+    Total_Cases = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Percentage = Total_Stroke / Total_Cases * 100
+  )
+
+# Plot All Stroke Types on One Plot
+final_plot <- ggplot(data_combined, aes(x = year, y = Percentage, color = Stroke_Type)) +
+  geom_point() +
+  geom_line(size = 1) +
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1)) +
+  labs(
+    title = "Динамика в структуре заболевания (%) по годам общегородская",
+    x = "Год",
+    y = "% от общего числа пролеченных"
+  ) +
+  theme_custom +
+  theme(
+    legend.title = element_text(size = 12, face = "bold"),
+    legend.position = "top",
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 10)
+  )
+
+# Print the Plot
+print(final_plot)
+
+```
+
+
+
+
 ```{r, fig.width = 12, fig.height = 2.5}
 
-stroke_types <- c("ИИ_Ишемический_Инсульт", "ГИ_Геморрагический_Инсульт")
+stroke_types <- c("ИИ_Ишемический_Инсульт", "ГИ_Геморрагический_Инсульт", "ТИА_Транзиторная_Ишемическая_Атака")
 
 plots <- list()
 
@@ -82,9 +130,14 @@ for (type in stroke_types) {
   
 
   plot <- ggplot(temp, aes(x = year, y = Percentage)) +
+    geom_rect(
+      aes(xmin = 2020, xmax = 2022, ymin = -Inf, ymax = Inf), 
+      fill = "red", alpha = 0.01  # Light red transparent highlight for COVID period
+    ) +
     geom_point() +
     geom_line() +
     scale_x_continuous(breaks = seq(2017, 2024, by = 1))+
+    scale_y_continuous(labels = scales::percent_format(scale = 1)) +
     labs(
       title = paste(type),
       x = NULL,
@@ -102,7 +155,7 @@ for (type in stroke_types) {
 
 combined_plot <- ggarrange(
   plotlist = plots, 
-  ncol = 2, 
+  ncol = 3, 
   nrow = 1,
   widths = c(1,1,1), 
   common.legend = TRUE,  
@@ -113,12 +166,14 @@ combined_plot <- ggarrange(
 
 final_plot <- annotate_figure(
   combined_plot,
-  top = text_grob("Динамика в структуре заболевания (%) по годам общегородская", size = 14, face = "bold"), 
-  left = text_grob("% от общего числа пролеченных", size = 10, face = "plain", rot = 90)   
+  top = text_grob("Disease structure trend", size = 14, face = "bold"), 
+  left = text_grob("% of total treated", size = 10, face = "plain", rot = 90)   
 )
 
 
 print(final_plot)
+
+ggsave("images/structure_trend_year.png", final_plot, width = 12, height = 4)
 ```
 
 # Месячная динамика в структуре заболевания (%) общегородская
@@ -153,18 +208,26 @@ for (type in stroke_types) {
   
 
   plot <- ggplot(temp, aes(x = year_month, y = Percentage)) +
+    annotate(
+      "rect",
+      xmin = as.Date("2020-03-01"), 
+      xmax = as.Date("2021-12-31"), 
+      ymin = -Inf, ymax = Inf, 
+      fill = "red", alpha = 0.1  # Adjust transparency level
+    ) +
     geom_point(size = 1) +
     geom_line() +
-    geom_smooth(method = "loess", span = 0.5, se = TRUE, color = "blue") +
+    geom_smooth(method = "loess", span = 0.5, se = TRUE, color = "darkred") +
     labs(
       title = paste(type),
       x = NULL,
       y = NULL
     ) +
     scale_x_date(
-    date_breaks = "3 month",      
+    date_breaks = "4 month",      
     date_labels = "%Y-%m"          
   ) +
+    scale_y_continuous(labels = scales::percent_format(scale = 1)) +
     theme_custom +
     theme(
       plot.title = element_text(size = 12),
@@ -177,7 +240,7 @@ for (type in stroke_types) {
 
 combined_plot <- ggarrange(
   plotlist = plots, 
-  ncol = 2, 
+  ncol = 3, 
   nrow = 1,
   widths = c(1,1,1), 
   common.legend = TRUE,  
@@ -188,13 +251,15 @@ combined_plot <- ggarrange(
 
 final_plot <- annotate_figure(
   combined_plot,
-  top = text_grob("Динамика в структуре заболевания (%) общегородская", size = 14, face = "bold"),  # Common title
+  top = text_grob("Disease structure dynamics by month", size = 14, face = "bold"),  # Common title
   bottom = text_grob("", size = 12, face = "plain"),  # Common x-axis title
-  left = text_grob("% от общего числа пролеченных", size = 10, face = "plain", rot = 90)  # Common y-axis title
+  left = text_grob("% of total treated", size = 10, face = "plain", rot = 90)  # Common y-axis title
 )
 
 
 print(final_plot)
+
+ggsave("images/structure_trend_month.png", final_plot, width = 12, height = 4)
 
 ```
 
@@ -258,21 +323,34 @@ data_prepared <- data %>%
 
 # Plot
 ggplot(data_prepared, aes(x = year_month, y = Летальные_Исходы_проц, colour = hosp)) +
-  geom_line(color = "black", size = 0.7) +  
-  geom_point(color = "black", size = 0.8) +
-  geom_smooth(method = "loess", span = 0.5, se = TRUE, color = "darkred") +
+  annotate(
+      "rect",
+      xmin = as.Date("2020-03-01"), 
+      xmax = as.Date("2021-12-31"), 
+      ymin = -Inf, ymax = Inf, 
+      fill = "red", alpha = 0.1  
+    ) +
+  geom_line(color = "black", size = 0.6) +  
+  geom_point(color = "black", size = 1.2) +
+  geom_smooth(method = "loess", span = 0.5, se = TRUE, color = "darkgreen") +
   scale_x_date(date_breaks = "3 months", 
                date_labels = "%Y-%m") + 
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
   labs(
-    title = "Thrombolysis",
+    title = "Thrombolysis rate by month",
     x = "",
     y = "% from total IS cases"
   ) +
   theme_custom +
   theme(
     legend.position = "none",
-    axis.text.x = element_text(angle = 90, hjust = 1, size = 10)
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 12),
+    # bold title
+    plot.title = element_text(size = 14, face = "bold")
   )
+
+ggsave("images/thromb_month.png", width = 6, height = 4)
 
 ```
 
@@ -450,21 +528,36 @@ data_prepared <- data %>%
   ) 
 
 # Plot
-ggplot(data_prepared, aes(x = year_month, y = Летальные_Исходы_проц, colour = hosp)) +
-  geom_line(color = "black", size = 0.5) +  
-  geom_point(color = "black", size = 0.8) +
+plot <- ggplot(data_prepared, aes(x = year_month, y = Летальные_Исходы_проц, colour = hosp)) +
+  annotate(
+      "rect",
+      xmin = as.Date("2020-03-01"), 
+      xmax = as.Date("2021-12-31"), 
+      ymin = -Inf, ymax = Inf, 
+      fill = "red", alpha = 0.1  
+    ) +
+  geom_line(color = "black", size = 0.7) +  
+  geom_point(color = "black", size = 1.2) +
   geom_smooth(method = "loess", span = 0.5, se = TRUE, color = "darkred") +
   scale_x_date(date_breaks = "3 months", date_labels = "%Y-%m") + 
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
   labs(
-    title = "Monthly mortality rate 2017-2025",
+    title = "Mortality rate by month",
     x = "",
     y = "% from total treated"
   ) +
   theme_custom +
   theme(
     legend.position = "none",
-    axis.text.x = element_text(angle = 90, hjust = 1, size = 10)
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 12),
+    # bold title
+    plot.title = element_text(size = 14, face = "bold")
   )
+
+print(plot)
+
+ggsave("images/mortality_month.png", width = 8, height = 4)
 ```
 
 ## Годовой тренд по летальным исходам в разных типах центров
@@ -494,12 +587,13 @@ ggplot(data_prepared, aes(x = year, y = Летальные_Исходы_проц
     y = "%"
   ) +
   scale_x_continuous(breaks = seq(2017, 2024, by = 1)) +  
+  scale_y_continuous(expand = c(0, 0)) + # Ensure the y-axis starts at 0
   theme_custom +
   theme(
     legend.position = "none"
-  
   ) +
-  facet_wrap(vars(type), scales = "free")
+  facet_wrap(vars(type), scales = "fixed")
+
 
 ```
 
@@ -524,10 +618,17 @@ data_prepared <- data %>%
 
 # Plot
 ggplot(data_prepared, aes(x = year_month, y = Летальные_Исходы_проц, colour = hosp)) +
-  geom_line(color = "black", size = 0.5) +  
-  geom_point(color = "black", size = 0.8) +
+  annotate(
+      "rect",
+      xmin = as.Date("2020-03-01"), 
+      xmax = as.Date("2021-12-31"), 
+      ymin = -Inf, ymax = Inf, 
+      fill = "red", alpha = 0.1  
+    ) +
+  geom_line(color = "black", size = 0.4) +  
+  geom_point(color = "black", size = 0.6) +
   geom_smooth(method = "loess", span = 0.3, se = TRUE, color = "darkred") +
-  scale_x_date(date_breaks = "3 months", date_labels = "%Y-%m") + 
+  scale_x_date(date_breaks = "4 months", date_labels = "%Y-%m") + 
   labs(
     title = "Monthly mortality rate in hosp type 1",
     x = "",
@@ -564,10 +665,17 @@ data_prepared <- data %>%
 
 # Plot
 ggplot(data_prepared, aes(x = year_month, y = Летальные_Исходы_проц, colour = hosp)) +
-  geom_line(color = "black", size = 0.5) +  
-  geom_point(color = "black", size = 0.8) +
+  annotate(
+      "rect",
+      xmin = as.Date("2020-03-01"), 
+      xmax = as.Date("2021-12-31"), 
+      ymin = -Inf, ymax = Inf, 
+      fill = "red", alpha = 0.1  
+    ) +
+  geom_line(color = "black", size = 0.4) +  
+  geom_point(color = "black", size = 0.6) +
   geom_smooth(method = "loess", span = 0.3, se = TRUE, color = "darkred") +
-  scale_x_date(date_breaks = "3 months", date_labels = "%Y-%m") + 
+  scale_x_date(date_breaks = "4 months", date_labels = "%Y-%m") + 
   labs(
     title = "Monthly mortality rate in hosp type 2",
     x = "",
@@ -581,6 +689,55 @@ ggplot(data_prepared, aes(x = year_month, y = Летальные_Исходы_п
   )
 
 
+```
+Mortality rate for each hospital
+
+
+```{r}
+data_prepared <- data %>%
+  # Create year_month column
+  mutate(year_month = anytime::anydate(paste0(year, "-", sprintf("%02d", month), "-01"))) %>%
+  group_by(hosp, year_month) %>%
+  summarise(
+    total_deaths = sum(Летальные_Исходы, na.rm = TRUE), 
+    total_cases = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE), 
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Летальные_Исходы_проц = total_deaths / total_cases * 100
+  ) 
+
+# Plot
+plot <- ggplot(data_prepared, aes(x = year_month, y = Летальные_Исходы_проц, colour = hosp)) +
+  annotate(
+      "rect",
+      xmin = as.Date("2020-03-01"), 
+      xmax = as.Date("2021-12-31"), 
+      ymin = -Inf, ymax = Inf, 
+      fill = "red", alpha = 0.2  
+    ) +
+  geom_line(color = "black", size = 0.4) +  
+  geom_point(color = "black", size = 0.6) +
+  geom_smooth(method = "loess", span = 0.3, se = TRUE, color = "darkred") +
+  scale_x_date(date_breaks = "4 months", date_labels = "%Y-%m") + 
+  labs(
+    title = "",
+    x = "",
+    y = "% from total treated"
+  ) +
+  facet_wrap(vars(hosp), scales = "free") +  # Facet by hospital
+  theme_custom +
+  theme(
+    legend.position = "none",
+    #axis.text.x = element_text(angle = 90, hjust = 1, size = 4),
+    axis.text.y = element_text(size = 6),
+    #remove x-axis text
+    axis.text.x = element_blank()
+  )
+
+print(plot)
+
+ggsave("images/mortality_hosp_month.png", width = 8, height = 4)
 ```
 
 
@@ -644,8 +801,8 @@ data_aggregated <- data %>%
   mutate(year_month = anytime::anydate(paste0(year, "-", sprintf("%02d", month), "-01"))) %>%
   group_by(year_month) %>%
   summarise(
-    total_window = sum(ИИ_Терапевтическое_Окно, ГИ_Терапевтическое_Окно, na.rm = TRUE),  
-    total_cases = sum(ИИ_Ишемический_Инсульт, ГИ_Геморрагический_Инсульт, na.rm = TRUE),
+    total_window = sum(Терапевтическое_Окно_4_5ч, na.rm = TRUE),  
+    total_cases = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   mutate(
@@ -658,22 +815,41 @@ data_aggregated <- data %>%
   )
 
 
-ggplot(data_aggregated, aes(x = year_month, y = percentage, color = type)) +
+plot <- ggplot(data_aggregated, aes(x = year_month, y = percentage, color = type)) +
+  annotate(
+      "rect",
+      xmin = as.Date("2020-03-01"), 
+      xmax = as.Date("2021-12-31"), 
+      ymin = -Inf, ymax = Inf, 
+      fill = "red", alpha = 0.1 
+    ) +
+  
   geom_line(color = "black") + 
   geom_point(color = "black") + 
-  geom_smooth(method = "loess", span = 0.5, se = TRUE, color = "darkred") +
+  geom_smooth(method = "loess", span = 0.5, se = TRUE, color = "darkblue") +
 
   labs(
-    title = "Общегородские доли пациентов, попавших в ТО (4.5 часа)",
+    title = "Therapeutic time window dynamics by month",
     x = "",
-    y = "%"
+    y = "% of total treated"
   ) +
   scale_x_continuous(breaks = seq(2017, 2024, by = 1)) +  
   scale_x_date(date_breaks = "3 months", date_labels = "%Y-%m") + 
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
   theme_custom +
   theme(
-    legend.position = "bottom",
+    legend.position = "none",
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 12),
+    # bold title
+    plot.title = element_text(size = 14, face = "bold")
   )
+
+print(plot)
+
+ggsave("images/therapeutic_window_month.png", plot, width = 6, height = 4)
+
+
 ```
 
 ## Месячные общегородские доли пациентов, попавших в ТО (4.5 часа) в разных типах центров
@@ -685,8 +861,8 @@ data_aggregated <- data %>%
   mutate(year_month = anytime::anydate(paste0(year, "-", sprintf("%02d", month), "-01"))) %>%
   group_by(type, year_month) %>%
   summarise(
-    total_window = sum(ИИ_Терапевтическое_Окно, ГИ_Терапевтическое_Окно, na.rm = TRUE),  
-    total_cases = sum(ИИ_Ишемический_Инсульт, ГИ_Геморрагический_Инсульт, na.rm = TRUE),
+    total_window = sum(Терапевтическое_Окно_4_5ч, na.rm = TRUE),  
+    total_cases = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
     .groups = "drop"
   ) %>%
   mutate(
@@ -720,6 +896,66 @@ ggplot(data_aggregated, aes(x = year_month, y = percentage, color = type)) +
   facet_wrap(vars(type), scales = "free")
 ```
 
+## ТО в "чистых" центрах
+
+
+```{r}
+
+data_aggregated <- data %>%
+  mutate(year_month = anytime::anydate(paste0(year, "-", sprintf("%02d", month), "-01")),
+         clean = case_when(
+           hosp %in% c("b3", "b26", "bsp") ~ "vascular (b3, b26, bsp)",
+           TRUE ~ "reclassified"
+         )) %>%
+  group_by(clean, year_month) %>%  # Preserve `clean` here
+  summarise(
+    total_window = sum(Терапевтическое_Окно_4_5ч, na.rm = TRUE),  
+    total_cases = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    проц = total_window / total_cases * 100
+  ) %>%
+  pivot_longer(
+    cols = c(проц),
+    names_to = "metric",
+    values_to = "percentage"
+  )
+
+ggplot(data_aggregated, aes(x = year_month, y = percentage, color = type)) +
+  annotate(
+      "rect",
+      xmin = as.Date("2020-03-01"), 
+      xmax = as.Date("2021-12-31"), 
+      ymin = -Inf, ymax = Inf, 
+      fill = "red", alpha = 0.1 
+    ) +
+  geom_line(color = "black") + 
+  geom_point(color = "black") + 
+  geom_smooth(method = "loess", span = 0.5, se = TRUE, color = "darkblue") +
+
+  labs(
+    title = "Therapeutic time window dynamics by COVID profile",
+    x = "",
+    y = "% of total treated"
+  ) +
+  scale_x_continuous(breaks = seq(2017, 2024, by = 1)) +  
+  scale_x_date(date_breaks = "4 months", date_labels = "%Y-%m") + 
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_custom +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 90, hjust = 1, size = 9),
+    axis.text.y = element_text(size = 10),
+    # bold title
+    plot.title = element_text(size = 14, face = "bold")
+  ) +
+  facet_wrap(vars(clean), scales = "free")
+```
+
+
+
+
 # Корреляционный анализ 
 
 
@@ -737,19 +973,20 @@ data_prepared <- data %>%
   mutate(year_month = anytime::anydate(paste0(year, "-", sprintf("%02d", month), "-01"))) %>%
   group_by(year_month) %>%
   summarise(
-    lethal_outcomes_perc = sum(Летальные_Исходы, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-    ishemic_stroke_perc = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-    gem_stroke_perc = sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    mortality = sum(Летальные_Исходы, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    IS_perc = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    GS_perc = sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
     age60_perc = sum(Старше_60_лет, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-    severeNIHSSS_prec = sum(NIHSS_Больше_21, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-    ii_therapeutic_window_perc = sum(ИИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
-    gi_therapeutic_window_perc = sum(ГИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) * 100,
+    severety_perc = sum(NIHSS_Больше_21, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    ii_TW_perc = sum(ИИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
+    gi_TW_perc = sum(ГИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) * 100,
+    total_window = sum(Терапе, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
     thromb_perc = sum(Тромболизис, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
     total_treated = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
     total_load = sum(Суммарная_Загрузка_ОНМК, na.rm = TRUE),
-    
     .groups = "drop"
   )
+    
 
 
 time_series_data <- data_prepared %>%
@@ -791,13 +1028,14 @@ data_prepared <- data %>%
   ) %>%
   group_by(hosp, year_month) %>%
   summarise(
-    lethal_outcomes_perc = sum(Летальные_Исходы, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-    ishemic_stroke_perc = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-    gem_stroke_perc = sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    mortality = sum(Летальные_Исходы, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    IS_perc = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    GS_perc = sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
     age60_perc = sum(Старше_60_лет, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-    severeNIHSSS_perc = sum(NIHSS_Больше_21, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-    ii_therapeutic_window_perc = sum(ИИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
-    gi_therapeutic_window_perc = sum(ГИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) * 100,
+    severety_perc = sum(NIHSS_Больше_21, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+    ii_TW_perc = sum(ИИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
+    gi_TW_perc = sum(ГИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) * 100,
+    total_window = sum(ИИ_Терапевтическое_Окно, ГИ_Терапевтическое_Окно, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
     thromb_perc = sum(Тромболизис, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
     total_treated = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
     total_load = sum(Суммарная_Загрузка_ОНМК, na.rm = TRUE),
@@ -838,10 +1076,84 @@ plots <- lapply(hospitals, function(hosp_name) {
   plot_upper_triangle(hosp_name, data_prepared)
 })
 
-# Display the first hospital's plot as an example
+
 plots[[1]]
 
 #ggplot2::ggsave("images/correlation_matrix_hosp2.png", plots[[2]])
 
 ```
+
+
+Correlation with significance
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+
+# Function to calculate correlation matrix and p-values
+calc_cor_pval <- function(data) {
+  var_names <- colnames(data)
+  cor_matrix <- cor(data, use = "pairwise.complete.obs", method = "pearson")
+  p_matrix <- matrix(NA, nrow = ncol(data), ncol = ncol(data))
+  colnames(p_matrix) <- var_names
+  rownames(p_matrix) <- var_names
+  
+  for (i in seq_len(ncol(data))) {
+    for (j in seq_len(ncol(data))) {
+      if (i <= j) {
+        test <- cor.test(data[[i]], data[[j]], method = "pearson")
+        p_matrix[i, j] <- test$p.value
+        p_matrix[j, i] <- test$p.value
+      }
+    }
+  }
+  
+  list(cor_matrix = cor_matrix, p_matrix = p_matrix)
+}
+
+# Calculate correlation matrix and p-values
+results <- calc_cor_pval(time_series_data)
+cor_matrix <- results$cor_matrix
+p_matrix <- results$p_matrix
+
+# Melt the correlation matrix and p-value matrix
+cor_melted <- melt(cor_matrix)
+p_melted <- melt(p_matrix)
+
+# Combine correlations and p-values into a single data frame
+cor_melted <- cor_melted %>%
+  rename(correlation = value) %>%
+  mutate(p_value = p_melted$value)
+
+# Add significance labels (e.g., "*")
+cor_melted <- cor_melted %>%
+  mutate(
+    sig_label = case_when(
+      p_value < 0.01 ~ "**",
+      p_value < 0.05 ~ "*",
+      TRUE ~ ""
+    )
+  )
+
+# Plot with significance labels
+cor_melted_plot <- ggplot(cor_melted, aes(Var1, Var2, fill = correlation)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = paste0(round(correlation, 2), sig_label)), color = "black", size = 5) +  # Add values with significance
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1, 1), space = "Lab", name = "Pearson r") +
+  labs(title = "",
+       x = "", y = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 15),
+        axis.text.y = element_text(size = 15))
+
+cor_melted_plot
+
+ggsave("images/correlation_matrix_significance.png", cor_melted_plot, width = 10, height = 8)
+
+```
+
+
+
 

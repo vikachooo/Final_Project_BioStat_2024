@@ -32,3 +32,23 @@ Study design: Observational cohort study - STROBE guideline
 
 ## Forecasting 
 
+![](images/model1.png)
+<br>
+![](images/model2.png)
+
+
+## Conclusions
+
+- Data analysis revealed a strong impact of external shocks (as demonstrated by COVID-19 period) on the healthcare system performance in St. Petersburg. 
+
+- Overall, vascular centers in St. Petersburg struggle to meet the MOH targets for the KPIs, but the trends are positive.
+
+- Predictive ability of historical data seems moderate in terms of predicting exact figures, but clearly fits the overall trends.
+
+- The SARIMAX model for predicting summarized hospital load in St. Petersburg achieved an 8% error, demonstrating strong predictive performance while capturing seasonal and trend patterns.
+
+
+<br>
+<br>
+Authours: Anna Andreychenko, Anrew Kravets, Victoria Zaitceva
+Supervisors: Tatiana Charitonova, Oleg Arnaut

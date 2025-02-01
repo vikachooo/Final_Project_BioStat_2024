@@ -460,20 +460,20 @@ server <- function(input, output) {
     data_prepared <- data_filtered %>%
       mutate(year_month = anytime::anydate(paste0(year, "-", sprintf("%02d", month), "-01"))) %>%
       group_by(year_month) %>%
-      summarize(
-        lethal_outcomes_perc = sum(Летальные_Исходы, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-        ishemic_stroke_perc = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-        gem_stroke_perc = sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-        age60_perc = sum(Старше_60_лет, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-        severeNIHSSS_prec = sum(NIHSS_Больше_21, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-        ii_therapeutic_window_perc = sum(ИИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
-        gi_therapeutic_window_perc = sum(ГИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) * 100,
-        total_therapeutic_window_perc = sum(Терапевтическое_Окно_4_5ч, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
-        thromb_perc = sum(Тромболизис, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
-        total_treated = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
-        total_load = sum(Суммарная_Загрузка_ОНМК, na.rm = TRUE),
-        .groups = "drop"
-      )
+    summarise(
+      mortality = sum(Летальные_Исходы, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+      IS_perc = sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+      GS_perc = sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+      age60_perc = sum(Старше_60_лет, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+      severety_perc = sum(NIHSS_Больше_21, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+      ii_TW_perc = sum(ИИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
+      gi_TW_perc = sum(ГИ_Терапевтическое_Окно, na.rm = TRUE) / sum(ГИ_Геморрагический_Инсульт, na.rm = TRUE) * 100,
+      total_window = sum(ИИ_Терапевтическое_Окно, ГИ_Терапевтическое_Окно, na.rm = TRUE) / sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE) * 100,
+      thromb_perc = sum(Тромболизис, na.rm = TRUE) / sum(ИИ_Ишемический_Инсульт, na.rm = TRUE) * 100,
+      total_treated = sum(Пролечены_с_ОНМК_Всего, na.rm = TRUE),
+      total_load = sum(Суммарная_Загрузка_ОНМК, na.rm = TRUE),
+      .groups = "drop"
+    )
 
     results <- calc_cor_pval(data_prepared[,-1])
     cor_matrix <- results$cor_matrix
@@ -496,7 +496,7 @@ server <- function(input, output) {
 
     ggplot(cor_melted, aes(Var1, Var2, fill = correlation)) +
       geom_tile(color = "white") +
-      geom_text(aes(label = paste0(round(correlation, 2), sig_label)), color = "black", size = 4) +
+      geom_text(aes(label = paste0(round(correlation, 2), sig_label)), color = "black", size = 5) +
       scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1, 1), space = "Lab", name = "Pearson r") +
       labs(title = "Correlation Matrix", x = "", y = "") +
       theme_minimal() +
